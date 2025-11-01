@@ -2,14 +2,22 @@
 
 /// A type that can be made into a signature.
 ///
-/// If implementing for a custom type, please use the derive macro instead.
+/// If implementing for a custom type, please use the derive macro.
 pub trait TypeSignature {
     /// The signature of this type.
+    ///
+    /// For a fixed type, if the hash of this value as produced by the derive macro changes, it
+    /// will be treated as a breaking change.
     const SIGNATURE: TypeSignatureHasher;
 
     /// A const-available u64 value.
+    ///
+    /// For a fixed type, if this value as produced by the derive macro changes, it will be treated
+    /// as a breaking change.
     const CONST_HASH: u64 = Self::SIGNATURE.const_hash();
 }
+
+pub use type_signature_derive::TypeSignature;
 
 /// A hashable type for generating a signature for a type.
 #[derive(Hash)]
@@ -19,7 +27,10 @@ pub struct TypeSignatureHasher {
     pub ty_name: &'static str,
     /// The types of the generic arguments.
     #[doc(hidden)]
-    pub generics: &'static [&'static TypeSignatureHasher],
+    pub ty_generics: &'static [&'static TypeSignatureHasher],
+    /// Hashes of const generics.
+    #[doc(hidden)]
+    pub const_generic_hashes: &'static [u64],
     /// The "variants" of a type.
     ///
     /// For each "variant", it has the name of the variant and a list of the field names and types.
@@ -35,45 +46,32 @@ impl TypeSignatureHasher {
     /// This function exists to cover for the inability to call [`Hash::hash`] at const-time, and
     /// will likely be deprecated once const traits exist.
     pub const fn const_hash(&self) -> u64 {
-        /// Mix a `u64` in to the accumulator.
-        ///
-        /// The mixing is done to ensure that the value is highly likely to change, and will likely
-        /// be different for applying values in a different order.
-        const fn mix_values(accumulator: &mut u64, value: u64) {
-            // Constants are all primes, so multiplying and adding shuffles the values around
-            // isomorphically.
-            *accumulator = accumulator
-                .wrapping_mul(0x35ce5fac9b4899b5)
-                .wrapping_add(0x1e5d49b970ead075)
-                | value
-                    .wrapping_mul(0x13fd608d551cc1d1)
-                    .wrapping_add(0x87b5240745caca0f);
-        }
-
-        /// Hash a string into a fixed `u64`.
-        ///
-        /// This function is designed to quickly jumble the contents
-        const fn hash_str(s: &str) -> u64 {
-            let mut accumulator = 0x1124262e5999d5bb;
-            let mut byte_idx = 0;
-            while byte_idx < s.len() {
-                mix_values(&mut accumulator, s.as_bytes()[byte_idx] as u64);
-                byte_idx += 1;
-            }
-            accumulator
-        }
-
         let mut accumulator = 0x1b6142dc880364ed;
 
         // Mix in the name of the type
-        mix_values(&mut accumulator, hash_str(self.ty_name));
+        __macro_export::mix_values(&mut accumulator, __macro_export::hash_str(self.ty_name));
 
         // Mix in the types of each generic.
         {
             let mut generic_idx = 0;
-            while generic_idx < self.generics.len() {
-                mix_values(&mut accumulator, self.generics[generic_idx].const_hash());
+            while generic_idx < self.ty_generics.len() {
+                __macro_export::mix_values(
+                    &mut accumulator,
+                    self.ty_generics[generic_idx].const_hash(),
+                );
                 generic_idx += 1;
+            }
+        }
+
+        // Mix in each const generic argument
+        {
+            let mut const_generic_idx = 0;
+            while const_generic_idx < self.const_generic_hashes.len() {
+                __macro_export::mix_values(
+                    &mut accumulator,
+                    self.const_generic_hashes[const_generic_idx],
+                );
+                const_generic_idx += 1;
             }
         }
 
@@ -82,12 +80,18 @@ impl TypeSignatureHasher {
             let mut variant_idx = 0;
             while variant_idx < self.variants.len() {
                 let (variant_name, variant_fields) = self.variants[variant_idx];
-                mix_values(&mut accumulator, hash_str(variant_name));
+                __macro_export::mix_values(
+                    &mut accumulator,
+                    __macro_export::hash_str(variant_name),
+                );
                 let mut field_idx = 0;
                 while field_idx < variant_fields.len() {
                     let (field_name, field_hasher) = variant_fields[field_idx];
-                    mix_values(&mut accumulator, hash_str(field_name));
-                    mix_values(&mut accumulator, field_hasher.const_hash());
+                    __macro_export::mix_values(
+                        &mut accumulator,
+                        __macro_export::hash_str(field_name),
+                    );
+                    __macro_export::mix_values(&mut accumulator, field_hasher.const_hash());
                     field_idx += 1;
                 }
                 variant_idx += 1;
@@ -106,9 +110,10 @@ macro_rules! impl_for_stdlib_ty {
         impl$( < $( $generic $( : $generic_cond )? ),* > )? $crate::TypeSignature for $stdty {
             const SIGNATURE: $crate::TypeSignatureHasher  = $crate::TypeSignatureHasher {
                 ty_name: stringify!($crate::TypeSignature impl for $stdty),
-                generics: &[
+                ty_generics: &[
                     $( $( &<$generic as $crate::TypeSignature>::SIGNATURE, )* )?
                 ],
+                const_generic_hashes: &[],
                 // Not formally correct, but good enough for stdlib types since they won't change
                 variants: &[],
             };
@@ -157,7 +162,8 @@ impl_for_stdlib_ty!(
 impl<const N: usize, T: TypeSignature> TypeSignature for [T; N] {
     const SIGNATURE: TypeSignatureHasher = TypeSignatureHasher {
         ty_name: "TypeSignature impl for [T; N]",
-        generics: &[&T::SIGNATURE],
+        ty_generics: &[&T::SIGNATURE],
+        const_generic_hashes: &[__macro_export::hash_const_usize(N)],
         // Not formally correct, but good enough for stdlib types since they won't change
         variants: &[],
     };
@@ -174,9 +180,10 @@ macro_rules! impl_for_tuple {
         {
             const SIGNATURE: TypeSignatureHasher  = TypeSignatureHasher {
                 ty_name: stringify!($crate::TypeSignature impl for ($( $elem_ty ),* ) ),
-                generics: &[
+                ty_generics: &[
                     $( &<$elem_ty as $crate::TypeSignature>::SIGNATURE, )*
                 ],
+                const_generic_hashes: &[],
                 // Not formally correct, but good enough for stdlib types since they won't change
                 variants: &[],
             };
@@ -213,8 +220,12 @@ mod std_impl {
     impl_for_stdlib_ty!(
         std::collections::HashMap<K, V> where <K: TypeSignature, V: TypeSignature>,
         std::collections::HashSet<T> where <T: TypeSignature>,
-        std::sync::Arc<T> where <T: TypeSignature>,
-        std::sync::Weak<T> where <T: TypeSignature>,
+        std::ffi::OsStr,
+        std::ffi::OsString,
+        std::path::Path,
+        std::path::PathBuf,
+        std::time::Instant,
+        std::time::SystemTime,
     );
 }
 
@@ -231,8 +242,69 @@ mod alloc_impl {
         alloc::collections::BTreeSet<T> where <T: TypeSignature>,
         alloc::collections::LinkedList<T> where <T: TypeSignature>,
         alloc::collections::VecDeque<T> where <T: TypeSignature>,
+        alloc::ffi::CString,
         alloc::rc::Rc<T> where <T: TypeSignature>,
         alloc::rc::Weak<T> where <T: TypeSignature>,
+        alloc::string::String,
+        alloc::sync::Arc<T> where <T: TypeSignature>,
+        alloc::sync::Weak<T> where <T: TypeSignature>,
         alloc::vec::Vec<T> where <T: TypeSignature>,
     );
+
+    impl<'a, B: TypeSignature + alloc::borrow::ToOwned + ?Sized + 'a> TypeSignature
+        for alloc::borrow::Cow<'a, B>
+    {
+        const SIGNATURE: crate::TypeSignatureHasher = crate::TypeSignatureHasher {
+            ty_name: "TypeSignature impl for Cow<'a, B>",
+            ty_generics: &[&<B as TypeSignature>::SIGNATURE],
+            const_generic_hashes: &[],
+            variants: &[],
+        };
+    }
+}
+
+#[doc(hidden)]
+pub mod __macro_export {
+    /// Hash a const `usize` value.
+    pub const fn hash_const_usize(param_val: usize) -> u64 {
+        let mut accumulator = hash_str("usize");
+        // TODO Better handle 128-bit targets
+        mix_values(&mut accumulator, param_val as u64);
+        accumulator
+    }
+
+    /// Hash a const `usize` value.
+    pub const fn hash_const_bool(param_val: bool) -> u64 {
+        let mut accumulator = hash_str("bool");
+        mix_values(&mut accumulator, param_val as u64);
+        accumulator
+    }
+
+    /// Mix a `u64` in to the accumulator.
+    ///
+    /// The mixing is done to ensure that the value is highly likely to change, and will likely
+    /// be different for applying values in a different order.
+    pub const fn mix_values(accumulator: &mut u64, value: u64) {
+        // Constants are all primes, so multiplying and adding shuffles the values around
+        // isomorphically.
+        *accumulator = accumulator
+            .wrapping_mul(0x35ce5fac9b4899b5)
+            .wrapping_add(0x1e5d49b970ead075)
+            ^ value
+                .wrapping_mul(0x13fd608d551cc1d1)
+                .wrapping_add(0x87b5240745caca0f);
+    }
+
+    /// Hash a string into a fixed `u64`.
+    ///
+    /// This function is designed to quickly jumble the contents
+    pub const fn hash_str(s: &str) -> u64 {
+        let mut accumulator = 0x1124262e5999d5bb;
+        let mut byte_idx = 0;
+        while byte_idx < s.len() {
+            mix_values(&mut accumulator, s.as_bytes()[byte_idx] as u64);
+            byte_idx += 1;
+        }
+        accumulator
+    }
 }

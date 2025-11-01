@@ -32,13 +32,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "type-signature"
-version = "0.1.0"
-dependencies = [
- "type-signature-derive",
-]
-
-[[package]]
 name = "type-signature-derive"
 version = "0.1.0"
 dependencies = [
