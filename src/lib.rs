@@ -43,7 +43,7 @@ pub struct TypeSignatureHasher {
 impl TypeSignatureHasher {
     /// Generate a hash at compile time.
     ///
-    /// This function exists to cover for the inability to call [`Hash::hash`] at const-time, and
+    /// This function exists to cover for the inability to call [`core::hash::Hash::hash`] at const-time, and
     /// will likely be deprecated once const traits exist.
     pub const fn const_hash(&self) -> u64 {
         let mut accumulator = 0x1b6142dc880364ed;
