@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use proc_macro::TokenStream as TokenStream1;
 
 use quote::quote;
@@ -47,10 +49,9 @@ pub fn derive_type_signature(input: TokenStream1) -> TokenStream1 {
             None
         }
     });
-    let (variants, generic_constraints) =
-        match ast.data {
-            syn::Data::Struct(st) => {
-                let (field_impls, field_tys) = match st.fields {
+    let (variants, generic_constraints) = match ast.data {
+        syn::Data::Struct(st) => {
+            let (field_impls, field_tys) = match st.fields {
                 syn::Fields::Unit => (Vec::new(), Vec::new()),
                 syn::Fields::Named(fields) => (
                     fields
@@ -75,29 +76,61 @@ pub fn derive_type_signature(input: TokenStream1) -> TokenStream1 {
                             quote!((#name, &<#ty as ::type_signature::TypeSignature>::SIGNATURE))
                         })
                         .collect(),
-                    fields.unnamed.iter().map(|field| field.ty.clone()).collect(),
+                    fields
+                        .unnamed
+                        .iter()
+                        .map(|field| field.ty.clone())
+                        .collect(),
                 ),
             };
-                let variants = vec![quote!(("", &[ #( #field_impls),* ] ))];
-                (variants, field_tys)
-            }
-            syn::Data::Enum(_enum) => (
-                vec![syn::Error::new(
-                    proc_macro2::Span::call_site(),
-                    "TODO: Support deriving for enums",
-                )
-                .to_compile_error()],
-                vec![],
-            ),
-            syn::Data::Union(_union) => (
-                vec![syn::Error::new(
-                    proc_macro2::Span::call_site(),
-                    "TODO: Support deriving for unions",
-                )
-                .to_compile_error()],
-                vec![],
-            ),
-        };
+            let variants = vec![quote!(("", &[ #( #field_impls),* ] ))];
+            (variants, field_tys)
+        }
+        syn::Data::Enum(en) => {
+            let (variants, per_variant_field_tys) = en
+                .variants
+                .iter()
+                .map(|variant| {
+                    let variant_name = variant.ident.to_string();
+                    let field_impls = variant
+                        .fields
+                        .iter()
+                        .enumerate()
+                        .map(|(idx, field)| {
+                            let name = field
+                                .ident
+                                .as_ref()
+                                .map_or_else(|| idx.to_string(), syn::Ident::to_string);
+                            let ty = &field.ty;
+                            quote!((#name, &<#ty as ::type_signature::TypeSignature>::SIGNATURE))
+                        })
+                        .collect::<Vec<_>>();
+                    let variant_impl = quote!((#variant_name, &[ #( #field_impls ),* ] ));
+                    let field_tys: Vec<_> = variant
+                        .fields
+                        .iter()
+                        .map(|field| field.ty.clone())
+                        .collect();
+                    (variant_impl, field_tys)
+                })
+                .unzip::<_, _, Vec<_>, Vec<_>>();
+            let field_tys = per_variant_field_tys
+                .into_iter()
+                .flatten()
+                .collect::<HashSet<_>>()
+                .into_iter()
+                .collect();
+            (variants, field_tys)
+        }
+        syn::Data::Union(_union) => (
+            vec![syn::Error::new(
+                proc_macro2::Span::call_site(),
+                "TODO: Support deriving for unions",
+            )
+            .to_compile_error()],
+            vec![],
+        ),
+    };
     // Only supply generic constraints if there's a generic type.
     let generic_constraints = if generic_ty_signatures.clone().next().is_some() {
         generic_constraints
