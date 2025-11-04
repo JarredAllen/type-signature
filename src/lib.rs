@@ -276,7 +276,15 @@ pub mod __macro_export {
     /// Hash a const `usize` value.
     pub const fn hash_const_bool(param_val: bool) -> u64 {
         let mut accumulator = hash_str("bool");
-        mix_values(&mut accumulator, param_val as u64);
+        mix_values(
+            &mut accumulator,
+            // Values chosen randomly to maximize number of bits different from any common pattern.
+            if param_val {
+                0x7907e475126f2049
+            } else {
+                0xa656facee66fd217
+            },
+        );
         accumulator
     }
 

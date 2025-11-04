@@ -38,6 +38,11 @@ struct TestStructConstGeneric<const COUNT: usize> {
 }
 
 #[derive(TypeSignature)]
+struct TestGenericBool<const BOOL: bool> {
+    a: i8,
+}
+
+#[derive(TypeSignature)]
 enum TestEnum {
     A(u32, i32),
     B { a: u32, b: String },
@@ -69,6 +74,9 @@ fn test_derived_hashes() {
         TestStructConstGeneric::<9>::CONST_HASH,
         0x46db_a403_2ea4_ca02,
     );
+
+    assert_eq!(TestGenericBool::<false>::CONST_HASH, 0x6554_7b4f_6421_be2a);
+    assert_eq!(TestGenericBool::<true>::CONST_HASH, 0x4de1_efe2_72bf_7428);
 
     assert_eq!(TestEnum::CONST_HASH, 0xc841_1fb4_bb52_c6bb);
     assert_eq!(TestEnumGeneric::<1, u32>::CONST_HASH, 0xc1b1_2cba_8758_b283);
