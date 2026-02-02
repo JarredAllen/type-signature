@@ -316,7 +316,8 @@ pub mod __macro_export {
 
     /// Hash a string into a fixed `u64`.
     ///
-    /// This function is designed to quickly jumble the contents
+    /// This function is designed to quickly jumble the contents, and result in vastly different
+    /// hashes for even subtly-different strings.
     #[must_use]
     pub const fn hash_str(s: &str) -> u64 {
         let mut accumulator = 0x1124262e5999d5bb;

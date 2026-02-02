@@ -86,3 +86,15 @@ fn test_derived_hashes() {
         0x7dfa_64be_80cd_776a,
     );
 }
+
+#[test]
+fn test_const_hash_computation() {
+    #[track_caller]
+    fn assert<T: TypeSignature>() {
+        assert_eq!(T::CONST_HASH, T::SIGNATURE.const_hash());
+    }
+    assert::<TestUnit>();
+    assert::<TestStruct>();
+    assert::<TestStructGeneric<u32>>();
+    assert::<TestEnumGeneric<5, u32>>();
+}
