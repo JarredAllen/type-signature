@@ -1,3 +1,7 @@
+//! Implementation of signatures for types.
+//!
+//! See the [`TypeSignature`] trait for more details.
+
 #![no_std]
 
 /// A type that can be made into a signature.
@@ -45,6 +49,7 @@ impl TypeSignatureHasher {
     ///
     /// This function exists to cover for the inability to call [`core::hash::Hash::hash`] at const-time, and
     /// will likely be deprecated once const traits exist.
+    #[must_use]
     pub const fn const_hash(&self) -> u64 {
         let mut accumulator = 0x1b6142dc880364ed;
 
@@ -207,8 +212,12 @@ impl_for_tuple!(
     (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11,),
     (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12,),
     (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13,),
-    (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14,),
-    (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15,),
+    (
+        T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14,
+    ),
+    (
+        T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15,
+    ),
 );
 
 #[cfg(feature = "std")]
@@ -266,6 +275,7 @@ mod alloc_impl {
 #[doc(hidden)]
 pub mod __macro_export {
     /// Hash a const `usize` value.
+    #[must_use]
     pub const fn hash_const_usize(param_val: usize) -> u64 {
         let mut accumulator = hash_str("usize");
         // TODO Better handle 128-bit targets
@@ -274,6 +284,7 @@ pub mod __macro_export {
     }
 
     /// Hash a const `usize` value.
+    #[must_use]
     pub const fn hash_const_bool(param_val: bool) -> u64 {
         let mut accumulator = hash_str("bool");
         mix_values(
@@ -306,6 +317,7 @@ pub mod __macro_export {
     /// Hash a string into a fixed `u64`.
     ///
     /// This function is designed to quickly jumble the contents
+    #[must_use]
     pub const fn hash_str(s: &str) -> u64 {
         let mut accumulator = 0x1124262e5999d5bb;
         let mut byte_idx = 0;

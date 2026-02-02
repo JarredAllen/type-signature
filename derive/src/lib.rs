@@ -1,10 +1,13 @@
+//! Derive macros for `type-signature` crate.
+
 use std::collections::HashSet;
 
 use proc_macro::TokenStream as TokenStream1;
 
 use quote::quote;
-use syn::{parse_macro_input, DeriveInput};
+use syn::{DeriveInput, parse_macro_input};
 
+/// Derive macro for `TypeSignature`.
 #[proc_macro_derive(TypeSignature)]
 pub fn derive_type_signature(input: TokenStream1) -> TokenStream1 {
     let ast = parse_macro_input!(input as DeriveInput);
@@ -32,7 +35,7 @@ pub fn derive_type_signature(input: TokenStream1) -> TokenStream1 {
                 _ => todo!("Support non-identifier types"),
             };
             let hash_fn_name = syn::Ident::new(
-                &format!("hash_const_{}", param_ty),
+                &format!("hash_const_{param_ty}"),
                 proc_macro2::Span::call_site(),
             );
             let param_val = &const_param.ident;
@@ -123,11 +126,13 @@ pub fn derive_type_signature(input: TokenStream1) -> TokenStream1 {
             (variants, field_tys)
         }
         syn::Data::Union(_union) => (
-            vec![syn::Error::new(
-                proc_macro2::Span::call_site(),
-                "TODO: Support deriving for unions",
-            )
-            .to_compile_error()],
+            vec![
+                syn::Error::new(
+                    proc_macro2::Span::call_site(),
+                    "TODO: Support deriving for unions",
+                )
+                .to_compile_error(),
+            ],
             vec![],
         ),
     };

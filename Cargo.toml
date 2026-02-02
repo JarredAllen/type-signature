@@ -11,5 +11,29 @@ default = ["std", "alloc"]
 std = ["alloc"]
 alloc = []
 
+[lints]
+workspace = true
+
 [workspace]
 members = [".", "./derive/"]
+
+[workspace.lints.rust]
+missing_docs = "warn"
+unused_extern_crates = "warn"
+unsafe_op_in_unsafe_fn = "warn"
+
+[workspace.lints.clippy]
+# Set the priority to -1 to allow overriding specific lints that we disagree with.
+complexity = { level = "warn", priority = -1 }
+correctness = { level = "warn", priority = -1 }
+perf = { level = "warn", priority = -1 }
+style = { level = "warn", priority = -1 }
+suspicious = { level = "warn", priority = -1 }
+
+# Specific lints:
+
+# Restriction lints
+allow_attributes_without_reason = "warn"
+undocumented_unsafe_blocks = "warn"
+unnecessary_safety_comment = "warn"
+unnecessary_self_imports = "warn"
