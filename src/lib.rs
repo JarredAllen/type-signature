@@ -7,6 +7,69 @@
 /// A type that can be made into a signature.
 ///
 /// If implementing for a custom type, please use the derive macro.
+///
+/// # Derive attributes
+///
+/// The derive macro accepts `#[type_signature(...)]` attributes to customize what goes into
+/// the signature:
+///
+/// - `#[type_signature(rename = "...")]` on the type — use the given name in the signature
+///   instead of the type's own identifier. Useful for keeping a signature stable across a type
+///   rename, or for matching the signature of a type in another crate.
+/// - `#[type_signature(rename = "...")]` on a field — use the given name for this field in
+///   the signature instead of the field's own identifier. Useful for renaming a field without
+///   breaking the signature.
+/// - `#[type_signature(skip)]` on a field — exclude the field from the signature. Use this for
+///   implementation-detail fields (caches, telemetry counters, `PhantomData`) whose presence
+///   shouldn't count as a breaking change to the type's observable contract.
+///
+/// ```
+/// use type_signature::TypeSignature;
+///
+/// // `rename` preserves the signature across a type rename.
+/// #[derive(TypeSignature)]
+/// struct Original {
+///     x: u32,
+/// }
+///
+/// #[derive(TypeSignature)]
+/// #[type_signature(rename = "Original")]
+/// struct Renamed {
+///     x: u32,
+/// }
+///
+/// assert_eq!(Original::CONST_HASH, Renamed::CONST_HASH);
+///
+/// // Field-level `rename` preserves the signature when a field is renamed.
+/// #[derive(TypeSignature)]
+/// struct HasFoo { foo: u32 }
+///
+/// #[derive(TypeSignature)]
+/// #[type_signature(rename = "HasFoo")]
+/// struct HasBar {
+///     #[type_signature(rename = "foo")]
+///     bar: u32,
+/// }
+///
+/// assert_eq!(HasFoo::CONST_HASH, HasBar::CONST_HASH);
+///
+/// // `skip` lets implementation-detail fields be added without changing the signature.
+/// // (Combined with `rename` here to simulate an in-place evolution of the same type.)
+/// #[derive(TypeSignature)]
+/// struct V1 {
+///     id: u32,
+/// }
+///
+/// #[derive(TypeSignature)]
+/// #[type_signature(rename = "V1")]
+/// struct V2 {
+///     id: u32,
+///     #[type_signature(skip)]
+///     cached: u64,
+/// }
+///
+/// assert_eq!(V1::CONST_HASH, V2::CONST_HASH);
+/// ```
 pub trait TypeSignature {
     /// The signature of this type.
     ///

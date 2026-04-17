@@ -26,11 +26,14 @@ struct TypeSignatureImpl {
     ///
     /// For a struct, there is only one variant, but an enum may have multiple.
     variants: Vec<TokenStream>,
+    /// If `Some`, override the name emitted into the signature (from `#[type_signature(rename = "...")]`).
+    rename: Option<String>,
 }
 impl TryFrom<DeriveInput> for TypeSignatureImpl {
     type Error = syn::Error;
 
     fn try_from(ast: DeriveInput) -> syn::Result<Self> {
+        let type_attrs = TypeAttrs::parse(&ast.attrs)?;
         for param in &ast.generics.params {
             if let syn::GenericParam::Const(const_param) = param {
                 let is_ident = matches!(
@@ -53,21 +56,23 @@ impl TryFrom<DeriveInput> for TypeSignatureImpl {
             .any(|param| matches!(param, syn::GenericParam::Type(_)));
         let (variants, generic_constraints) = match ast.data {
             syn::Data::Struct(st) => {
-                let (field_impls, field_tys) = fields_info(&st.fields);
+                let (field_impls, field_tys) = fields_info(&st.fields)?;
                 let variants = vec![quote!(("", &[ #( #field_impls ),* ]))];
                 (variants, field_tys)
             }
             syn::Data::Enum(en) => {
-                let (variants, per_variant_field_tys): (Vec<_>, Vec<_>) = en
+                let rows = en
                     .variants
                     .iter()
-                    .map(|variant| {
+                    .map(|variant| -> syn::Result<_> {
                         let variant_name = variant.ident.to_string();
-                        let (field_impls, field_tys) = fields_info(&variant.fields);
+                        let (field_impls, field_tys) = fields_info(&variant.fields)?;
                         let variant_impl = quote!((#variant_name, &[ #( #field_impls ),* ]));
-                        (variant_impl, field_tys)
+                        Ok((variant_impl, field_tys))
                     })
-                    .unzip();
+                    .collect::<syn::Result<Vec<_>>>()?;
+                let (variants, per_variant_field_tys): (Vec<_>, Vec<_>) =
+                    rows.into_iter().unzip();
                 let field_tys = per_variant_field_tys
                     .into_iter()
                     .flatten()
@@ -80,18 +85,29 @@ impl TryFrom<DeriveInput> for TypeSignatureImpl {
                 .fields
                 .named
                 .iter()
-                .map(|field| {
-                    let name = field
-                        .ident
-                        .as_ref()
-                        .expect("union fields are always named")
-                        .to_string();
+                .filter_map(|field| {
+                    let attrs = match FieldAttrs::parse(&field.attrs) {
+                        Ok(a) => a,
+                        Err(e) => return Some(Err(e)),
+                    };
+                    if attrs.skip {
+                        return None;
+                    }
+                    let name = attrs.rename.unwrap_or_else(|| {
+                        field
+                            .ident
+                            .as_ref()
+                            .expect("union fields are always named")
+                            .to_string()
+                    });
                     let ty = &field.ty;
                     let variant = quote!(
                         (#name, &[("", &<#ty as ::type_signature::TypeSignature>::SIGNATURE)])
                     );
-                    (variant, field.ty.clone())
+                    Some(Ok((variant, field.ty.clone())))
                 })
+                .collect::<syn::Result<Vec<_>>>()?
+                .into_iter()
                 .unzip(),
         };
         // Only supply generic constraints if there's a generic type.
@@ -105,6 +121,7 @@ impl TryFrom<DeriveInput> for TypeSignatureImpl {
             generics: ast.generics,
             generic_constraints,
             variants,
+            rename: type_attrs.rename,
         })
     }
 }
@@ -116,7 +133,10 @@ impl quote::ToTokens for TypeSignatureImpl {
     fn to_token_stream(&self) -> TokenStream {
         let (impl_generics, ty_generics, where_clause) = self.generics.split_for_impl();
         let ident = &self.ident;
-        let ty_name = self.ident.to_string();
+        let ty_name = self
+            .rename
+            .clone()
+            .unwrap_or_else(|| self.ident.to_string());
         let generic_constraints = &self.generic_constraints;
         let variants = &self.variants;
         let generic_ty_signatures = self.generics.params.iter().filter_map(|param| {
@@ -172,7 +192,7 @@ impl quote::ToTokens for TypeSignatureImpl {
 }
 
 /// Derive macro for `TypeSignature`.
-#[proc_macro_derive(TypeSignature)]
+#[proc_macro_derive(TypeSignature, attributes(type_signature))]
 pub fn derive_type_signature(input: TokenStream1) -> TokenStream1 {
     let ast = parse_macro_input!(input as DeriveInput);
     match TypeSignatureImpl::try_from(ast) {
@@ -183,18 +203,96 @@ pub fn derive_type_signature(input: TokenStream1) -> TokenStream1 {
 }
 
 /// Build `(field_impl_tokens, field_type)` pairs for every field, covering unit/named/tuple shapes.
-fn fields_info(fields: &syn::Fields) -> (Vec<TokenStream>, Vec<syn::Type>) {
-    fields
+///
+/// Fields marked `#[type_signature(skip)]` are omitted from both vectors.
+fn fields_info(fields: &syn::Fields) -> syn::Result<(Vec<TokenStream>, Vec<syn::Type>)> {
+    let rows = fields
         .iter()
         .enumerate()
-        .map(|(idx, field)| {
-            let name = field
-                .ident
-                .as_ref()
-                .map_or_else(|| idx.to_string(), syn::Ident::to_string);
+        .filter_map(|(idx, field)| {
+            let attrs = match FieldAttrs::parse(&field.attrs) {
+                Ok(a) => a,
+                Err(e) => return Some(Err(e)),
+            };
+            if attrs.skip {
+                return None;
+            }
+            let name = attrs.rename.unwrap_or_else(|| {
+                field
+                    .ident
+                    .as_ref()
+                    .map_or_else(|| idx.to_string(), syn::Ident::to_string)
+            });
             let ty = &field.ty;
-            let impl_tokens = quote!((#name, &<#ty as ::type_signature::TypeSignature>::SIGNATURE));
-            (impl_tokens, field.ty.clone())
+            let impl_tokens =
+                quote!((#name, &<#ty as ::type_signature::TypeSignature>::SIGNATURE));
+            Some(Ok((impl_tokens, field.ty.clone())))
         })
-        .unzip()
+        .collect::<syn::Result<Vec<_>>>()?;
+    Ok(rows.into_iter().unzip())
+}
+
+/// Parsed `#[type_signature(...)]` attributes at the type level.
+#[derive(Default)]
+struct TypeAttrs {
+    /// Override the name used in the signature. Lets the signature survive a type rename.
+    rename: Option<String>,
+}
+
+impl TypeAttrs {
+    fn parse(attrs: &[syn::Attribute]) -> syn::Result<Self> {
+        let mut out = Self::default();
+        for attr in attrs {
+            if !attr.path().is_ident("type_signature") {
+                continue;
+            }
+            attr.parse_nested_meta(|meta| {
+                if meta.path.is_ident("rename") {
+                    let lit: syn::LitStr = meta.value()?.parse()?;
+                    out.rename = Some(lit.value());
+                    Ok(())
+                } else {
+                    Err(meta.error(
+                        "unrecognized type_signature attribute; expected `rename = \"...\"`",
+                    ))
+                }
+            })?;
+        }
+        Ok(out)
+    }
+}
+
+/// Parsed `#[type_signature(...)]` attributes at the field level.
+#[derive(Default)]
+struct FieldAttrs {
+    /// Omit this field from the signature entirely.
+    skip: bool,
+    /// Override the name used for this field in the signature.
+    rename: Option<String>,
+}
+
+impl FieldAttrs {
+    fn parse(attrs: &[syn::Attribute]) -> syn::Result<Self> {
+        let mut out = Self::default();
+        for attr in attrs {
+            if !attr.path().is_ident("type_signature") {
+                continue;
+            }
+            attr.parse_nested_meta(|meta| {
+                if meta.path.is_ident("skip") {
+                    out.skip = true;
+                    Ok(())
+                } else if meta.path.is_ident("rename") {
+                    let lit: syn::LitStr = meta.value()?.parse()?;
+                    out.rename = Some(lit.value());
+                    Ok(())
+                } else {
+                    Err(meta.error(
+                        "unrecognized type_signature attribute; expected `skip` or `rename = \"...\"`",
+                    ))
+                }
+            })?;
+        }
+        Ok(out)
+    }
 }

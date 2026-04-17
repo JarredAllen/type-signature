@@ -73,6 +73,65 @@ union TestUnionGeneric<T: Copy> {
     b: u64,
 }
 
+#[derive(TypeSignature)]
+#[type_signature(rename = "TestStruct")]
+struct TestStructRenamed {
+    a: u32,
+    b: String,
+}
+
+// Both of these renamed to the same signature name so we can verify that adding a skipped
+// field leaves the hash unchanged.
+#[derive(TypeSignature)]
+#[type_signature(rename = "SkipTarget")]
+struct TestStructSkipBaseline {
+    a: u32,
+    b: String,
+}
+
+#[derive(TypeSignature)]
+#[type_signature(rename = "SkipTarget")]
+struct TestStructWithSkippedField {
+    a: u32,
+    b: String,
+    #[type_signature(skip)]
+    _cached: u64,
+}
+
+#[derive(TypeSignature)]
+#[type_signature(rename = "SkipEnum")]
+enum TestEnumSkipBaseline {
+    A(u32, i32),
+    B { a: u32, b: String },
+}
+
+#[derive(TypeSignature)]
+#[type_signature(rename = "SkipEnum")]
+enum TestEnumWithSkippedField {
+    A(u32, i32),
+    B {
+        a: u32,
+        b: String,
+        #[type_signature(skip)]
+        _cached: u64,
+    },
+}
+
+// Field-level rename: the renamed field should hash to the same value as a field declared
+// under the replacement name directly.
+#[derive(TypeSignature)]
+#[type_signature(rename = "FieldRenameTarget")]
+struct TestFieldRenameBaseline {
+    original: u32,
+}
+
+#[derive(TypeSignature)]
+#[type_signature(rename = "FieldRenameTarget")]
+struct TestFieldRenamed {
+    #[type_signature(rename = "original")]
+    renamed: u32,
+}
+
 #[test]
 fn test_derived_hashes() {
     assert_eq!(TestUnit::CONST_HASH, 0x2446_9e8c_0e4e_3d4c);
@@ -108,6 +167,37 @@ fn test_derived_hashes() {
     assert_eq!(TestUnion::CONST_HASH, 0x7a61_7d4b_e7ad_2011);
     assert_eq!(TestUnionGeneric::<u32>::CONST_HASH, 0x8c42_1a1f_ce70_ad8b);
     assert_eq!(TestUnionGeneric::<i64>::CONST_HASH, 0x3cdb_4a7b_0fd4_e42f);
+}
+
+#[test]
+fn test_rename_attribute_matches_original() {
+    // `#[type_signature(rename = "TestStruct")]` should produce the same signature as the
+    // original type it renames to.
+    assert_eq!(TestStruct::CONST_HASH, TestStructRenamed::CONST_HASH);
+}
+
+#[test]
+fn test_field_rename_attribute_matches_original() {
+    // Renaming a field to its previous name should preserve the signature.
+    assert_eq!(
+        TestFieldRenameBaseline::CONST_HASH,
+        TestFieldRenamed::CONST_HASH,
+    );
+}
+
+#[test]
+fn test_skip_attribute_omits_field() {
+    // A struct with a `#[type_signature(skip)]` field should hash identically to one without
+    // the skipped field.
+    assert_eq!(
+        TestStructSkipBaseline::CONST_HASH,
+        TestStructWithSkippedField::CONST_HASH,
+    );
+    // Skipping also works inside enum variants.
+    assert_eq!(
+        TestEnumSkipBaseline::CONST_HASH,
+        TestEnumWithSkippedField::CONST_HASH,
+    );
 }
 
 #[test]
