@@ -143,7 +143,8 @@ impl quote::ToTokens for TypeSignatureImpl {
         let variants = &self.variants;
         let generic_ty_signatures = self.generics.params.iter().filter_map(|param| {
             if let syn::GenericParam::Type(ty) = param {
-                Some(quote!(&<#ty as ::type_signature::TypeSignature>::SIGNATURE))
+                let ident = &ty.ident;
+                Some(quote!(&<#ident as ::type_signature::TypeSignature>::SIGNATURE))
             } else {
                 None
             }

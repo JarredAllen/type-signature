@@ -30,6 +30,13 @@ struct TestStructGeneric<Ty> {
     b: String,
 }
 
+/// A test struct with some generics.
+#[derive(TypeSignature)]
+struct TestStructGenericConstrained<Ty: PartialEq> {
+    a: Ty,
+    b: String,
+}
+
 /// A test struct without any generics.
 #[derive(TypeSignature)]
 struct TestStructConstGeneric<const COUNT: usize> {
@@ -96,5 +103,6 @@ fn test_const_hash_computation() {
     assert::<TestUnit>();
     assert::<TestStruct>();
     assert::<TestStructGeneric<u32>>();
+    assert::<TestStructGenericConstrained<String>>();
     assert::<TestEnumGeneric<5, u32>>();
 }
