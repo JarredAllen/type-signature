@@ -30,10 +30,6 @@ struct TypeSignatureImpl {
 impl TryFrom<DeriveInput> for TypeSignatureImpl {
     type Error = syn::Error;
 
-    #[expect(
-        clippy::too_many_lines,
-        reason = "temporary; split up once the per-variant logic is factored out"
-    )]
     fn try_from(ast: DeriveInput) -> syn::Result<Self> {
         for param in &ast.generics.params {
             if let syn::GenericParam::Const(const_param) = param {
@@ -57,69 +53,21 @@ impl TryFrom<DeriveInput> for TypeSignatureImpl {
             .any(|param| matches!(param, syn::GenericParam::Type(_)));
         let (variants, generic_constraints) = match ast.data {
             syn::Data::Struct(st) => {
-                let (field_impls, field_tys) = match st.fields {
-                syn::Fields::Unit => (Vec::new(), Vec::new()),
-                syn::Fields::Named(fields) => (
-                    fields
-                        .named
-                        .iter()
-                        .map(|field| {
-                            let name = field.ident.as_ref().ok_or_else(|| syn::Error::new(proc_macro2::Span::call_site(), "Missing field ident"))?.to_string();
-                            let ty = &field.ty;
-                            Ok(quote!((#name, &<#ty as ::type_signature::TypeSignature>::SIGNATURE)))
-                        })
-                        .collect::<syn::Result<_>>()?,
-                    fields.named.iter().map(|field| field.ty.clone()).collect(),
-                ),
-                syn::Fields::Unnamed(fields) => (
-                    fields
-                        .unnamed
-                        .iter()
-                        .enumerate()
-                        .map(|(idx, field)| {
-                            let name = idx.to_string();
-                            let ty = &field.ty;
-                            quote!((#name, &<#ty as ::type_signature::TypeSignature>::SIGNATURE))
-                        })
-                        .collect(),
-                    fields
-                        .unnamed
-                        .iter()
-                        .map(|field| field.ty.clone())
-                        .collect(),
-                ),
-                };
-                let variants = vec![quote!(("", &[ #( #field_impls),* ] ))];
+                let (field_impls, field_tys) = fields_info(&st.fields);
+                let variants = vec![quote!(("", &[ #( #field_impls ),* ]))];
                 (variants, field_tys)
             }
             syn::Data::Enum(en) => {
-                let (variants, per_variant_field_tys) = en
+                let (variants, per_variant_field_tys): (Vec<_>, Vec<_>) = en
                     .variants
                     .iter()
                     .map(|variant| {
                         let variant_name = variant.ident.to_string();
-                        let field_impls = variant
-                        .fields
-                        .iter()
-                        .enumerate()
-                        .map(|(idx, field)| {
-                            let name = field
-                                .ident
-                                .as_ref()
-                                .map_or_else(|| idx.to_string(), syn::Ident::to_string);
-                            let ty = &field.ty;
-                            quote!((#name, &<#ty as ::type_signature::TypeSignature>::SIGNATURE))
-                        })
-                        .collect::<Vec<_>>();
-                        let variant_impl = quote!((#variant_name, &[ #( #field_impls ),* ] ));
-                        let field_tys: Vec<_> = variant
-                            .fields
-                            .iter()
-                            .map(|field| field.ty.clone())
-                            .collect();
+                        let (field_impls, field_tys) = fields_info(&variant.fields);
+                        let variant_impl = quote!((#variant_name, &[ #( #field_impls ),* ]));
                         (variant_impl, field_tys)
                     })
-                    .unzip::<_, _, Vec<_>, Vec<_>>();
+                    .unzip();
                 let field_tys = per_variant_field_tys
                     .into_iter()
                     .flatten()
@@ -128,25 +76,23 @@ impl TryFrom<DeriveInput> for TypeSignatureImpl {
                     .collect();
                 (variants, field_tys)
             }
-            syn::Data::Union(un) => {
-                let variants = un
-                    .fields
-                    .named
-                    .iter()
-                    .map(|field| {
-                        let name = field.ident.as_ref().ok_or_else(|| syn::Error::new(proc_macro2::Span::call_site(), "Missing field ident"))?.to_string();
-                        let ty = &field.ty;
-                        Ok(quote!((#name, &[("", &<#ty as ::type_signature::TypeSignature>::SIGNATURE)])))
-                    })
-                    .collect::<syn::Result<_>>()?;
-                let field_tys = un
-                    .fields
-                    .named
-                    .iter()
-                    .map(|field| field.ty.clone())
-                    .collect();
-                (variants, field_tys)
-            }
+            syn::Data::Union(un) => un
+                .fields
+                .named
+                .iter()
+                .map(|field| {
+                    let name = field
+                        .ident
+                        .as_ref()
+                        .expect("union fields are always named")
+                        .to_string();
+                    let ty = &field.ty;
+                    let variant = quote!(
+                        (#name, &[("", &<#ty as ::type_signature::TypeSignature>::SIGNATURE)])
+                    );
+                    (variant, field.ty.clone())
+                })
+                .unzip(),
         };
         // Only supply generic constraints if there's a generic type.
         let generic_constraints = if any_generic_tys {
@@ -234,4 +180,21 @@ pub fn derive_type_signature(input: TokenStream1) -> TokenStream1 {
         Err(e) => e.into_compile_error(),
     }
     .into()
+}
+
+/// Build `(field_impl_tokens, field_type)` pairs for every field, covering unit/named/tuple shapes.
+fn fields_info(fields: &syn::Fields) -> (Vec<TokenStream>, Vec<syn::Type>) {
+    fields
+        .iter()
+        .enumerate()
+        .map(|(idx, field)| {
+            let name = field
+                .ident
+                .as_ref()
+                .map_or_else(|| idx.to_string(), syn::Ident::to_string);
+            let ty = &field.ty;
+            let impl_tokens = quote!((#name, &<#ty as ::type_signature::TypeSignature>::SIGNATURE));
+            (impl_tokens, field.ty.clone())
+        })
+        .unzip()
 }
