@@ -61,6 +61,18 @@ enum TestEnumGeneric<const LENGTH: usize, T> {
     B { a: T, b: [String; LENGTH] },
 }
 
+#[derive(TypeSignature)]
+union TestUnion {
+    a: u32,
+    b: f64,
+}
+
+#[derive(TypeSignature)]
+union TestUnionGeneric<T: Copy> {
+    a: T,
+    b: u64,
+}
+
 #[test]
 fn test_derived_hashes() {
     assert_eq!(TestUnit::CONST_HASH, 0x516b_1ca0_0731_3421);
@@ -92,6 +104,10 @@ fn test_derived_hashes() {
         TestEnumGeneric::<1, TestUnit>::CONST_HASH,
         0x7dfa_64be_80cd_776a,
     );
+
+    assert_eq!(TestUnion::CONST_HASH, 0x3e3e_3a9f_c454_794a);
+    assert_eq!(TestUnionGeneric::<u32>::CONST_HASH, 0xe8cd_23f0_19d5_fd16);
+    assert_eq!(TestUnionGeneric::<i64>::CONST_HASH, 0x2d7a_0cba_f350_96e8);
 }
 
 #[test]
@@ -105,4 +121,6 @@ fn test_const_hash_computation() {
     assert::<TestStructGeneric<u32>>();
     assert::<TestStructGenericConstrained<String>>();
     assert::<TestEnumGeneric<5, u32>>();
+    assert::<TestUnion>();
+    assert::<TestUnionGeneric<u32>>();
 }

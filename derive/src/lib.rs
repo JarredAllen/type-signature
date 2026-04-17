@@ -109,11 +109,24 @@ impl TryFrom<DeriveInput> for TypeSignatureImpl {
                     .collect();
                 (variants, field_tys)
             }
-            syn::Data::Union(_union) => {
-                return Err(syn::Error::new(
-                    proc_macro2::Span::call_site(),
-                    "TODO: Support deriving for unions",
-                ));
+            syn::Data::Union(un) => {
+                let variants = un
+                    .fields
+                    .named
+                    .iter()
+                    .map(|field| {
+                        let name = field.ident.as_ref().ok_or_else(|| syn::Error::new(proc_macro2::Span::call_site(), "Missing field ident"))?.to_string();
+                        let ty = &field.ty;
+                        Ok(quote!((#name, &[("", &<#ty as ::type_signature::TypeSignature>::SIGNATURE)])))
+                    })
+                    .collect::<syn::Result<_>>()?;
+                let field_tys = un
+                    .fields
+                    .named
+                    .iter()
+                    .map(|field| field.ty.clone())
+                    .collect();
+                (variants, field_tys)
             }
         };
         // Only supply generic constraints if there's a generic type.
@@ -205,20 +218,4 @@ pub fn derive_type_signature(input: TokenStream1) -> TokenStream1 {
         Err(e) => e.into_compile_error(),
     }
     .into()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    // TODO Remove this test when union support is added
-    #[test]
-    fn assert_fails_for_union() {
-        assert!(
-            TypeSignatureImpl::try_from(
-                syn::parse2::<DeriveInput>(quote! { union SampleUnion {} }).unwrap()
-            )
-            .is_err()
-        );
-    }
 }
