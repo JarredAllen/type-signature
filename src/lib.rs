@@ -1,12 +1,31 @@
-//! Implementation of signatures for types.
-//!
-//! See the [`TypeSignature`] trait for more details.
-
+#![doc = include_str!("../README.md")]
 #![no_std]
 
 /// A type that can be made into a signature.
 ///
-/// If implementing for a custom type, please use the derive macro.
+/// If implementing for a custom type, prefer to use the derive macro.
+///
+/// # What affects the signature
+///
+/// The signature captures the structural shape of the type. The following changes rotate
+/// the hash:
+///
+/// - Renaming the type, a field, or an enum variant (unless `#[type_signature(rename = "...")]`
+///   is applied to keep the signature's view of the name unchanged).
+/// - Adding, removing, or reordering fields or variants.
+/// - Changing a field's type.
+/// - Adding, removing, or reordering generic type parameters.
+/// - Changing the value of a const generic.
+/// - Converting between a tuple struct and a named-field struct (or equivalent changes to
+///   enum variant shapes).
+///
+/// The following changes leave the hash untouched:
+///
+/// - Field or type visibility (`pub` vs private).
+/// - Trait and method implementations on the type.
+/// - Doc comments and attributes other than `#[type_signature(...)]`.
+/// - Adding, removing, or modifying fields marked `#[type_signature(skip)]`.
+/// - Lifetime parameters and where-clause bounds.
 ///
 /// # Derive attributes
 ///
