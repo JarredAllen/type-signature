@@ -20,7 +20,11 @@ members = [".", "./derive/"]
 [workspace.lints.rust]
 missing_docs = "warn"
 unused_extern_crates = "warn"
-unsafe_op_in_unsafe_fn = "warn"
+unsafe_code = "forbid"
+missing_debug_implementations = "warn"
+unreachable_pub = "warn"
+unused_qualifications = "warn"
+single_use_lifetimes = "warn"
 
 [workspace.lints.clippy]
 # Set the priority to -1 to allow overriding specific lints that we disagree with.
@@ -29,11 +33,19 @@ correctness = { level = "warn", priority = -1 }
 perf = { level = "warn", priority = -1 }
 style = { level = "warn", priority = -1 }
 suspicious = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+cargo = { level = "warn", priority = -1 }
 
 # Specific lints:
 
 # Restriction lints
-allow_attributes_without_reason = "warn"
-undocumented_unsafe_blocks = "warn"
-unnecessary_safety_comment = "warn"
 unnecessary_self_imports = "warn"
+allow_attributes_without_reason = "warn"
+
+# no_std discipline
+std_instead_of_core = "warn"
+std_instead_of_alloc = "warn"
+alloc_instead_of_core = "warn"
+
+# Temporarily silenced — revisit before publishing.
+cargo_common_metadata = "allow"

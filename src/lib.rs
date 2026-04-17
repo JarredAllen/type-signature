@@ -24,7 +24,7 @@ pub trait TypeSignature {
 pub use type_signature_derive::TypeSignature;
 
 /// A hashable type for generating a signature for a type.
-#[derive(Hash)]
+#[derive(Debug, Hash)]
 pub struct TypeSignatureHasher {
     /// The name of the type being hashed.
     #[doc(hidden)]
@@ -51,13 +51,14 @@ impl TypeSignatureHasher {
     /// will likely be deprecated once const traits exist.
     #[must_use]
     pub const fn const_hash(&self) -> u64 {
-        let mut accumulator = 0x1b6142dc880364ed;
+        let mut accumulator = 0x1b61_42dc_8803_64ed;
 
         // Mix in the name of the type
         __macro_export::mix_values(&mut accumulator, __macro_export::hash_str(self.ty_name));
 
-        // Mix in the types of each generic.
+        // Mix in the types of each generic. Length first so boundaries are unambiguous.
         {
+            __macro_export::mix_values(&mut accumulator, self.ty_generics.len() as u64);
             let mut generic_idx = 0;
             while generic_idx < self.ty_generics.len() {
                 __macro_export::mix_values(
@@ -70,6 +71,7 @@ impl TypeSignatureHasher {
 
         // Mix in each const generic argument
         {
+            __macro_export::mix_values(&mut accumulator, self.const_generic_hashes.len() as u64);
             let mut const_generic_idx = 0;
             while const_generic_idx < self.const_generic_hashes.len() {
                 __macro_export::mix_values(
@@ -82,6 +84,7 @@ impl TypeSignatureHasher {
 
         // Mix in the types and names of each field.
         {
+            __macro_export::mix_values(&mut accumulator, self.variants.len() as u64);
             let mut variant_idx = 0;
             while variant_idx < self.variants.len() {
                 let (variant_name, variant_fields) = self.variants[variant_idx];
@@ -89,6 +92,7 @@ impl TypeSignatureHasher {
                     &mut accumulator,
                     __macro_export::hash_str(variant_name),
                 );
+                __macro_export::mix_values(&mut accumulator, variant_fields.len() as u64);
                 let mut field_idx = 0;
                 while field_idx < variant_fields.len() {
                     let (field_name, field_hasher) = variant_fields[field_idx];
@@ -291,9 +295,9 @@ pub mod __macro_export {
             &mut accumulator,
             // Values chosen randomly to maximize number of bits different from any common pattern.
             if param_val {
-                0x7907e475126f2049
+                0x7907_e475_126f_2049
             } else {
-                0xa656facee66fd217
+                0xa656_face_e66f_d217
             },
         );
         accumulator
@@ -307,11 +311,11 @@ pub mod __macro_export {
         // Constants are all primes, so multiplying and adding shuffles the values around
         // isomorphically.
         *accumulator = accumulator
-            .wrapping_mul(0x35ce5fac9b4899b5)
-            .wrapping_add(0x1e5d49b970ead075)
+            .wrapping_mul(0x35ce_5fac_9b48_99b5)
+            .wrapping_add(0x1e5d_49b9_70ea_d075)
             ^ value
-                .wrapping_mul(0x13fd608d551cc1d1)
-                .wrapping_add(0x87b5240745caca0f);
+                .wrapping_mul(0x13fd_608d_551c_c1d1)
+                .wrapping_add(0x87b5_2407_45ca_ca0f);
     }
 
     /// Hash a string into a fixed `u64`.
@@ -320,7 +324,7 @@ pub mod __macro_export {
     /// hashes for even subtly-different strings.
     #[must_use]
     pub const fn hash_str(s: &str) -> u64 {
-        let mut accumulator = 0x1124262e5999d5bb;
+        let mut accumulator = 0x1124_262e_5999_d5bb;
         let mut byte_idx = 0;
         while byte_idx < s.len() {
             mix_values(&mut accumulator, s.as_bytes()[byte_idx] as u64);

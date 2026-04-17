@@ -30,7 +30,26 @@ struct TypeSignatureImpl {
 impl TryFrom<DeriveInput> for TypeSignatureImpl {
     type Error = syn::Error;
 
+    #[expect(
+        clippy::too_many_lines,
+        reason = "temporary; split up once the per-variant logic is factored out"
+    )]
     fn try_from(ast: DeriveInput) -> syn::Result<Self> {
+        for param in &ast.generics.params {
+            if let syn::GenericParam::Const(const_param) = param {
+                let is_ident = matches!(
+                    &const_param.ty,
+                    syn::Type::Path(syn::TypePath { qself: None, path })
+                        if path.get_ident().is_some()
+                );
+                if !is_ident {
+                    return Err(syn::Error::new_spanned(
+                        &const_param.ty,
+                        "TypeSignature derive only supports const generic parameters whose type is a simple identifier (e.g. `usize`, `bool`)",
+                    ));
+                }
+            }
+        }
         let any_generic_tys = ast
             .generics
             .params
@@ -145,7 +164,7 @@ impl TryFrom<DeriveInput> for TypeSignatureImpl {
 }
 impl quote::ToTokens for TypeSignatureImpl {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        tokens.extend(self.to_token_stream())
+        tokens.extend(self.to_token_stream());
     }
 
     fn to_token_stream(&self) -> TokenStream {
@@ -164,16 +183,13 @@ impl quote::ToTokens for TypeSignatureImpl {
         });
         let const_generic_signatures = self.generics.params.iter().filter_map(|param| {
             if let syn::GenericParam::Const(const_param) = param {
-                let param_ty = match &const_param.ty {
-                    syn::Type::Path(syn::TypePath { qself: None, path }) => {
-                        if let Some(ident) = path.get_ident() {
-                            ident.to_string()
-                        } else {
-                            todo!("Support non-identifier types");
-                        }
-                    }
-                    _ => todo!("Support non-identifier types"),
+                let syn::Type::Path(syn::TypePath { qself: None, path }) = &const_param.ty else {
+                    unreachable!("validated in TryFrom::try_from")
                 };
+                let param_ty = path
+                    .get_ident()
+                    .expect("validated in TryFrom::try_from")
+                    .to_string();
                 let hash_fn_name = syn::Ident::new(
                     &format!("hash_const_{param_ty}"),
                     proc_macro2::Span::call_site(),
