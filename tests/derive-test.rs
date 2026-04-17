@@ -75,39 +75,39 @@ union TestUnionGeneric<T: Copy> {
 
 #[test]
 fn test_derived_hashes() {
-    assert_eq!(TestUnit::CONST_HASH, 0xe8b2_2977_f5ae_fe94);
-    assert_eq!(TestStruct::CONST_HASH, 0x131a_87bc_de0f_eae9);
-    assert_eq!(TestTupleStruct::CONST_HASH, 0xba5c_6efb_76b8_e97d);
+    assert_eq!(TestUnit::CONST_HASH, 0x2446_9e8c_0e4e_3d4c);
+    assert_eq!(TestStruct::CONST_HASH, 0x7068_f6f1_a597_2995);
+    assert_eq!(TestTupleStruct::CONST_HASH, 0x511d_d71f_5726_c6e0);
 
-    assert_eq!(TestStructGeneric::<u32>::CONST_HASH, 0xf36b_5b81_3448_e6bd);
-    assert_eq!(TestStructGeneric::<i32>::CONST_HASH, 0x5311_e941_e5e1_317d);
+    assert_eq!(TestStructGeneric::<u32>::CONST_HASH, 0x5f58_0797_60df_cafc);
+    assert_eq!(TestStructGeneric::<i32>::CONST_HASH, 0x3831_4104_ac5b_860c);
     assert_eq!(
         TestStructGeneric::<TestStruct>::CONST_HASH,
-        0x315f_a4b8_433b_6f3d,
+        0xde92_ebad_566f_94d8,
     );
     assert_eq!(
         TestStructConstGeneric::<8>::CONST_HASH,
-        0x5772_f58d_8002_0f26,
+        0xb636_e030_0648_3dde,
     );
     assert_eq!(
         TestStructConstGeneric::<9>::CONST_HASH,
-        0x22ed_6918_75dc_c50e,
+        0xe44e_0414_f6b9_0c72,
     );
 
-    assert_eq!(TestGenericBool::<false>::CONST_HASH, 0x64a9_4738_2a48_179f);
-    assert_eq!(TestGenericBool::<true>::CONST_HASH, 0x8380_00d7_4ddd_715d);
+    assert_eq!(TestGenericBool::<false>::CONST_HASH, 0xbc52_f29c_2410_f176);
+    assert_eq!(TestGenericBool::<true>::CONST_HASH, 0x1379_d224_4310_812c);
 
-    assert_eq!(TestEnum::CONST_HASH, 0xf0ab_1786_fd46_2e0f);
-    assert_eq!(TestEnumGeneric::<1, u32>::CONST_HASH, 0xd865_ec03_7b63_268d);
-    assert_eq!(TestEnumGeneric::<2, u32>::CONST_HASH, 0x440a_1b42_6910_fd7a);
+    assert_eq!(TestEnum::CONST_HASH, 0xc5c4_3b76_21f8_8d61);
+    assert_eq!(TestEnumGeneric::<1, u32>::CONST_HASH, 0x4dfc_9dc0_21f6_7ed3);
+    assert_eq!(TestEnumGeneric::<2, u32>::CONST_HASH, 0x1d17_d768_1139_a46c);
     assert_eq!(
         TestEnumGeneric::<1, TestUnit>::CONST_HASH,
-        0x949b_e7d4_8683_2e9d,
+        0x49bd_7ea8_7af5_d8c7,
     );
 
-    assert_eq!(TestUnion::CONST_HASH, 0x376b_05ee_d2f0_7a50);
-    assert_eq!(TestUnionGeneric::<u32>::CONST_HASH, 0xa993_b675_3aa0_a3d3);
-    assert_eq!(TestUnionGeneric::<i64>::CONST_HASH, 0xa988_d718_6c15_4897);
+    assert_eq!(TestUnion::CONST_HASH, 0x7a61_7d4b_e7ad_2011);
+    assert_eq!(TestUnionGeneric::<u32>::CONST_HASH, 0x8c42_1a1f_ce70_ad8b);
+    assert_eq!(TestUnionGeneric::<i64>::CONST_HASH, 0x3cdb_4a7b_0fd4_e42f);
 }
 
 #[test]

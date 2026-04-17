@@ -331,6 +331,7 @@ pub mod __macro_export {
     #[must_use]
     pub const fn hash_str(s: &str) -> u64 {
         let mut accumulator = 0x1124_262e_5999_d5bb;
+        mix_values(&mut accumulator, s.len() as u64);
         let mut byte_idx = 0;
         while byte_idx < s.len() {
             mix_values(&mut accumulator, s.as_bytes()[byte_idx] as u64);
