@@ -163,8 +163,11 @@ impl_for_stdlib_ty!(
     core::ops::RangeToInclusive<T> where <T: TypeSignature>,
     core::pin::Pin<T> where <T: TypeSignature>,
     core::ptr::NonNull<T> where <T: TypeSignature>,
+    core::sync::atomic::AtomicBool,
     core::sync::atomic::AtomicU8, core::sync::atomic::AtomicU16, core::sync::atomic::AtomicU32, core::sync::atomic::AtomicU64, core::sync::atomic::AtomicUsize,
     core::sync::atomic::AtomicI8, core::sync::atomic::AtomicI16, core::sync::atomic::AtomicI32, core::sync::atomic::AtomicI64, core::sync::atomic::AtomicIsize,
+    core::cmp::Ordering,
+    core::convert::Infallible,
     core::time::Duration,
 );
 
@@ -237,6 +240,9 @@ mod std_impl {
         std::ffi::OsString,
         std::path::Path,
         std::path::PathBuf,
+        std::sync::Mutex<T> where <T: TypeSignature>,
+        std::sync::RwLock<T> where <T: TypeSignature>,
+        std::sync::Once,
         std::time::Instant,
         std::time::SystemTime,
     );
