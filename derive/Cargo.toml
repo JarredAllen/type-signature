@@ -2,6 +2,15 @@
 name = "type-signature-derive"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.85"
+authors = ["Jarred Allen <jarredallen73@gmail.com>"]
+description = "Derive macro for the `type-signature` crate. Not intended for direct use - depend on `type-signature` instead."
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/JarredAllen/type-signature"
+documentation = "https://docs.rs/type-signature-derive"
+readme = "README.md"
+keywords = ["hash", "type", "signature", "derive", "no-std"]
+categories = ["data-structures", "rust-patterns"]
 
 [lib]
 proc-macro = true

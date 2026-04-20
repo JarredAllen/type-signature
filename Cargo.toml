@@ -2,9 +2,18 @@
 name = "type-signature"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.85"
+authors = ["Jarred Allen <jarredallen73@gmail.com>"]
+description = "Compile-time stable structural hash of a Rust type, via a derive macro."
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/JarredAllen/type-signature"
+documentation = "https://docs.rs/type-signature"
+readme = "README.md"
+keywords = ["hash", "type", "signature", "schema", "no-std"]
+categories = ["data-structures", "encoding", "no-std", "rust-patterns"]
 
 [dependencies]
-type-signature-derive.path = "./derive/"
+type-signature-derive = { version = "=0.1.0", path = "./derive/" }
 
 [features]
 default = ["std", "alloc"]
@@ -46,6 +55,3 @@ allow_attributes_without_reason = "warn"
 std_instead_of_core = "warn"
 std_instead_of_alloc = "warn"
 alloc_instead_of_core = "warn"
-
-# Temporarily silenced — revisit before publishing.
-cargo_common_metadata = "allow"
