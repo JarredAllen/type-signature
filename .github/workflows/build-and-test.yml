@@ -14,12 +14,43 @@ env:
 
 jobs:
   rust:
+    name: Build and Test (${{ matrix.toolchain.name }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        toolchain:
+          - name: stable
+            version: stable
+          - name: MSRV
+            version: msrv  # sentinel — resolved from Cargo.toml below
 
     steps:
     - uses: actions/checkout@v4
+    - name: Resolve toolchain version
+      id: toolchain
+      run: |
+        if [ "${{ matrix.toolchain.version }}" = "msrv" ]; then
+          version=$(awk -F'"' '/^rust-version[[:space:]]*=/ {print $2; exit}' Cargo.toml)
+          if [ -z "$version" ]; then
+            echo "::error::Could not find rust-version in Cargo.toml"
+            exit 1
+          fi
+        else
+          version="${{ matrix.toolchain.version }}"
+        fi
+        echo "Using toolchain: $version"
+        echo "version=$version" >> "$GITHUB_OUTPUT"
+    - name: Install toolchain
+      uses: actions-rust-lang/setup-rust-toolchain@v1
+      with:
+        toolchain: ${{ steps.toolchain.outputs.version }}
+        components: clippy
+        cache: false
     - name: Rust Cache
       uses: Swatinem/rust-cache@v2.9.1
+      with:
+        key: ${{ matrix.toolchain.name }}
     - name: Run Clippy
       uses: auguwu/clippy-action@1.5.0
       with:
