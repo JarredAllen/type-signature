@@ -36,3 +36,9 @@ struct Message {
 // breaking way will fail this assertion.
 const _: () = assert!(Message::CONST_HASH == 0x7190_e284_5c80_29a5);
 ```
+
+## MSRV Policy
+
+This crate has a minimum supported Rust version in the `Cargo.toml`. It may be
+updated on minor version releases of this crate, but will be at least 2 release
+cycles old.
