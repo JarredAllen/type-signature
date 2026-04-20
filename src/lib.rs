@@ -23,7 +23,8 @@
 ///
 /// - Field or type visibility (`pub` vs private).
 /// - Trait and method implementations on the type.
-/// - Doc comments and attributes other than `#[type_signature(...)]`.
+/// - Doc comments and attributes other than `#[type_signature(...)]` (including `#[repr(..)]`
+///   attributes!).
 /// - Adding, removing, or modifying fields marked `#[type_signature(skip)]`.
 /// - Lifetime parameters and where-clause bounds.
 ///
@@ -106,6 +107,9 @@ pub trait TypeSignature {
 pub use type_signature_derive::TypeSignature;
 
 /// A hashable type for generating a signature for a type.
+///
+/// The fields of this struct are not considered a stable API contract, and are not to be
+/// explicitly referenced in calling code.
 #[derive(Debug, Hash)]
 pub struct TypeSignatureHasher {
     /// The name of the type being hashed.
@@ -200,7 +204,9 @@ macro_rules! impl_for_stdlib_ty {
     ),+ $(,)?) => {$(
         impl$( < $( $generic $( : $generic_cond )? ),* > )? $crate::TypeSignature for $stdty {
             const SIGNATURE: $crate::TypeSignatureHasher  = $crate::TypeSignatureHasher {
-                ty_name: stringify!($crate::TypeSignature impl for $stdty),
+                // `ty_name` in derive macro is just the type name, so this should avoid possible
+                // conflicts.
+                ty_name: concat!(stringify!($crate::TypeSignature), " impl for ", stringify!($stdty)),
                 ty_generics: &[
                     $( $( &<$generic as $crate::TypeSignature>::SIGNATURE, )* )?
                 ],
@@ -273,7 +279,7 @@ macro_rules! impl_for_tuple {
             where $( $elem_ty : TypeSignature ),*
         {
             const SIGNATURE: TypeSignatureHasher  = TypeSignatureHasher {
-                ty_name: stringify!($crate::TypeSignature impl for ($( $elem_ty ),* ) ),
+                ty_name: concat!(stringify!($crate::TypeSignature), " impl for (", $( stringify!($elem_ty), "," ),* ),
                 ty_generics: &[
                     $( &<$elem_ty as $crate::TypeSignature>::SIGNATURE, )*
                 ],
@@ -370,8 +376,11 @@ pub mod __macro_export {
     #[must_use]
     pub const fn hash_const_usize(param_val: usize) -> u64 {
         let mut accumulator = hash_str("usize");
-        // TODO Better handle 128-bit targets
         mix_values(&mut accumulator, param_val as u64);
+        // Handle 128-bit targets.
+        if size_of::<usize>() == 16 {
+            mix_values(&mut accumulator, (param_val >> 8) as u64);
+        }
         accumulator
     }
 
