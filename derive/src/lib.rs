@@ -71,8 +71,7 @@ impl TryFrom<DeriveInput> for TypeSignatureImpl {
                         Ok((variant_impl, field_tys))
                     })
                     .collect::<syn::Result<Vec<_>>>()?;
-                let (variants, per_variant_field_tys): (Vec<_>, Vec<_>) =
-                    rows.into_iter().unzip();
+                let (variants, per_variant_field_tys): (Vec<_>, Vec<_>) = rows.into_iter().unzip();
                 let field_tys = per_variant_field_tys
                     .into_iter()
                     .flatten()
@@ -131,7 +130,15 @@ impl quote::ToTokens for TypeSignatureImpl {
     }
 
     fn to_token_stream(&self) -> TokenStream {
-        let (impl_generics, ty_generics, where_clause) = self.generics.split_for_impl();
+        let (impl_generics, ty_generics, _) = self.generics.split_for_impl();
+        // Extract the raw predicates (without the leading `where` keyword) so we can merge
+        // them with our own `FieldTy: TypeSignature` bounds under a single `where` clause.
+        let user_where_predicates: Vec<&syn::WherePredicate> = self
+            .generics
+            .where_clause
+            .as_ref()
+            .map(|wc| wc.predicates.iter().collect())
+            .unwrap_or_default();
         let ident = &self.ident;
         let ty_name = self
             .rename
@@ -177,9 +184,10 @@ impl quote::ToTokens for TypeSignatureImpl {
         quote! {
             impl #impl_generics ::type_signature::TypeSignature for #ident #ty_generics
                 where
-                #where_clause
-                #( #generic_constraints: TypeSignature ),*
+                    #( #user_where_predicates, )*
+                    #( #generic_constraints: ::type_signature::TypeSignature ),*
             {
+                #![allow(single_use_lifetimes, reason = "Macro-generated code")]
                 const SIGNATURE: ::type_signature::TypeSignatureHasher = ::type_signature::TypeSignatureHasher {
                     ty_name: #ty_name,
                     ty_generics: &[ #( #generic_ty_signatures ),* ],
@@ -224,8 +232,7 @@ fn fields_info(fields: &syn::Fields) -> syn::Result<(Vec<TokenStream>, Vec<syn::
                     .map_or_else(|| idx.to_string(), syn::Ident::to_string)
             });
             let ty = &field.ty;
-            let impl_tokens =
-                quote!((#name, &<#ty as ::type_signature::TypeSignature>::SIGNATURE));
+            let impl_tokens = quote!((#name, &<#ty as ::type_signature::TypeSignature>::SIGNATURE));
             Some(Ok((impl_tokens, field.ty.clone())))
         })
         .collect::<syn::Result<Vec<_>>>()?;
