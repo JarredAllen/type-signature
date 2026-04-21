@@ -370,6 +370,9 @@ mod alloc_impl {
     }
 }
 
+/// Items exported only for use in the derive macro.
+///
+/// Do not treat anything in here like a public API.
 #[doc(hidden)]
 pub mod __macro_export {
     /// Hash a const `usize` value.
