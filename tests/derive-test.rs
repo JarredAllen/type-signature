@@ -221,6 +221,15 @@ enum TestEnumVariantAllSkipped {
     A(#[type_signature(skip)] u32, #[type_signature(skip)] u64),
 }
 
+// Struct where the only generic-typed field is skipped: exercises the unconditional
+// `T: TypeSignature` bound, since T appears in `ty_generics` but no un-skipped field
+// references it.
+#[derive(TypeSignature)]
+struct TestGenericAllFieldsSkipped<T> {
+    #[type_signature(skip)]
+    _marker: core::marker::PhantomData<T>,
+}
+
 #[test]
 fn test_derived_hashes() {
     assert_eq!(TestUnit::CONST_HASH, 0x2446_9e8c_0e4e_3d4c);
@@ -258,6 +267,16 @@ fn test_derived_hashes() {
     assert_eq!(TestUnionGeneric::<i64>::CONST_HASH, 0x3cdb_4a7b_0fd4_e42f);
 
     assert_eq!(TestEnumAllVariantShapes::CONST_HASH, 0x7c70_4007_50e1_0228,);
+
+    assert_eq!(
+        TestGenericAllFieldsSkipped::<u32>::CONST_HASH,
+        0xf72a_2be3_2e8d_0575,
+    );
+    // Different T yields different hash (the type parameter is in ty_generics).
+    assert_ne!(
+        TestGenericAllFieldsSkipped::<u32>::CONST_HASH,
+        TestGenericAllFieldsSkipped::<i32>::CONST_HASH,
+    );
 }
 
 /// Golden hashes for stdlib types. These are part of the public API: any change to the
@@ -393,4 +412,5 @@ fn test_const_hash_computation() {
     assert::<TestEnumGeneric<5, u32>>();
     assert::<TestUnion>();
     assert::<TestUnionGeneric<u32>>();
+    assert::<TestGenericAllFieldsSkipped<u32>>();
 }

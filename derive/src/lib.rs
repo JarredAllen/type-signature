@@ -14,13 +14,14 @@ struct TypeSignatureImpl {
     ident: syn::Ident,
     /// Any generics on the target type.
     generics: syn::Generics,
-    /// Constraints upon generic types, if any.
+    /// Extra `FieldTy: TypeSignature` bounds derived from the types of the (non-skipped)
+    /// fields.
     ///
-    /// We can only implement `TypeSignature` if all fields implement `TypeSignature`. Unlike
-    /// stdlib derive macros, we only limit the implementation based on field types. But to
-    /// minimize the risk of adding a `SomeConcreteTyNotImplementingTypeSignature: TypeSignature`
-    /// bound that effectively always turns off the impl, the field constraints are only applied if
-    /// a generic type parameter exists, and this field is otherwise an empty `Vec`.
+    /// Used in addition to the unconditional `T: TypeSignature` bound on every generic type
+    /// parameter, to cover user-defined generic types whose `TypeSignature` impl carries extra
+    /// trait bounds (e.g. `MyWrapper<T> where T: SomeTrait + TypeSignature`). Only populated when
+    /// the type has at least one generic type parameter, to avoid adding a `SomeConcreteTy:
+    /// TypeSignature` bound that could effectively disable the impl.
     generic_constraints: Vec<syn::Type>,
     /// The list of variants for this type.
     ///
@@ -149,6 +150,17 @@ impl quote::ToTokens for TypeSignatureImpl {
             .unwrap_or_else(|| self.ident.to_string());
         let generic_constraints = &self.generic_constraints;
         let variants = &self.variants;
+        // Every generic type parameter is unconditionally bounded by `TypeSignature`.
+        // This covers cases where the parameter appears only in `ty_generics` (e.g. empty
+        // enums, or structs where every generic-typed field is `#[type_signature(skip)]`).
+        let generic_ty_bounds = self.generics.params.iter().filter_map(|param| {
+            if let syn::GenericParam::Type(ty) = param {
+                let ident = &ty.ident;
+                Some(quote!(#ident: ::type_signature::TypeSignature))
+            } else {
+                None
+            }
+        });
         let generic_ty_signatures = self.generics.params.iter().filter_map(|param| {
             if let syn::GenericParam::Type(ty) = param {
                 let ident = &ty.ident;
@@ -188,6 +200,7 @@ impl quote::ToTokens for TypeSignatureImpl {
             impl #impl_generics ::type_signature::TypeSignature for #ident #ty_generics
                 where
                     #( #user_where_predicates, )*
+                    #( #generic_ty_bounds, )*
                     #( #generic_constraints: ::type_signature::TypeSignature ),*
             {
                 #![allow(single_use_lifetimes, reason = "Macro-generated code")]

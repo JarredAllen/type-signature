@@ -4,7 +4,8 @@
 
 /// A type that can be made into a signature.
 ///
-/// If implementing for a custom type, prefer to use the derive macro.
+/// If implementing for a custom type, prefer to use the derive macro. Note that the derive macro
+/// requires all fields to implement this trait, as well as all generic arguments.
 ///
 /// # What affects the signature
 ///
