@@ -37,6 +37,9 @@
 /// - `#[type_signature(rename = "...")]` on the type — use the given name in the signature
 ///   instead of the type's own identifier. Useful for keeping a signature stable across a type
 ///   rename, or for matching the signature of a type in another crate.
+/// - `#[type_signature(rename = "...")]` on an enum variant — use the given name for this
+///   variant in the signature instead of the variant's own identifier. Useful for renaming a
+///   variant without breaking the signature.
 /// - `#[type_signature(rename = "...")]` on a field — use the given name for this field in
 ///   the signature instead of the field's own identifier. Useful for renaming a field without
 ///   breaking the signature.

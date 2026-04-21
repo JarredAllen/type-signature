@@ -65,7 +65,10 @@ impl TryFrom<DeriveInput> for TypeSignatureImpl {
                     .variants
                     .iter()
                     .map(|variant| -> syn::Result<_> {
-                        let variant_name = variant.ident.to_string();
+                        let variant_attrs = TypeAttrs::parse(&variant.attrs)?;
+                        let variant_name = variant_attrs
+                            .rename
+                            .unwrap_or_else(|| variant.ident.to_string());
                         let (field_impls, field_tys) = fields_info(&variant.fields)?;
                         let variant_impl = quote!((#variant_name, &[ #( #field_impls ),* ]));
                         Ok((variant_impl, field_tys))

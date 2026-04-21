@@ -171,6 +171,56 @@ where
     x: T,
 }
 
+// Variant-level rename: the renamed variant should hash the same as a variant declared
+// under the replacement name directly.
+#[derive(TypeSignature)]
+#[type_signature(rename = "VariantRenameTarget")]
+enum TestVariantRenameBaseline {
+    Original(u32),
+    Other,
+}
+
+#[derive(TypeSignature)]
+#[type_signature(rename = "VariantRenameTarget")]
+enum TestVariantRenamed {
+    #[type_signature(rename = "Original")]
+    Renamed(u32),
+    Other,
+}
+
+// Edge case: an enum with no variants.
+#[derive(TypeSignature)]
+enum TestEmptyEnum {}
+
+// Edge case: a struct where every field is skipped. Should hash identically to a unit struct
+// with the same (renamed) name, since the derive's field list collapses to empty.
+#[derive(TypeSignature)]
+#[type_signature(rename = "AllSkippedTarget")]
+struct TestUnitForAllSkipped;
+
+#[derive(TypeSignature)]
+#[type_signature(rename = "AllSkippedTarget")]
+struct TestAllFieldsSkipped {
+    #[type_signature(skip)]
+    _a: u32,
+    #[type_signature(skip)]
+    _b: u64,
+}
+
+// Edge case: an enum variant with all fields skipped should hash identically to a unit
+// variant with the same name.
+#[derive(TypeSignature)]
+#[type_signature(rename = "VariantAllSkippedTarget")]
+enum TestEnumVariantUnit {
+    A,
+}
+
+#[derive(TypeSignature)]
+#[type_signature(rename = "VariantAllSkippedTarget")]
+enum TestEnumVariantAllSkipped {
+    A(#[type_signature(skip)] u32, #[type_signature(skip)] u64),
+}
+
 #[test]
 fn test_derived_hashes() {
     assert_eq!(TestUnit::CONST_HASH, 0x2446_9e8c_0e4e_3d4c);
@@ -261,6 +311,41 @@ fn test_where_clause_does_not_affect_signature() {
     assert_eq!(
         TestWhereClauseBaseline::<u32>::CONST_HASH,
         TestWhereClauseWith::<u32>::CONST_HASH,
+    );
+}
+
+#[test]
+fn test_variant_rename_attribute_matches_original() {
+    // Renaming a variant to its previous name should preserve the signature.
+    assert_eq!(
+        TestVariantRenameBaseline::CONST_HASH,
+        TestVariantRenamed::CONST_HASH,
+    );
+}
+
+#[test]
+fn test_empty_enum_hash_is_stable() {
+    // Lock down the hash for an enum with zero variants.
+    assert_eq!(TestEmptyEnum::CONST_HASH, 0x595c_03fe_4407_6d53);
+}
+
+#[test]
+fn test_all_fields_skipped_matches_unit_struct() {
+    // A struct with every field skipped should collapse to the same signature as a unit
+    // struct with the same name.
+    assert_eq!(
+        TestUnitForAllSkipped::CONST_HASH,
+        TestAllFieldsSkipped::CONST_HASH,
+    );
+}
+
+#[test]
+fn test_variant_all_fields_skipped_matches_unit_variant() {
+    // An enum variant where every field is skipped should match a unit variant with the
+    // same name.
+    assert_eq!(
+        TestEnumVariantUnit::CONST_HASH,
+        TestEnumVariantAllSkipped::CONST_HASH,
     );
 }
 
