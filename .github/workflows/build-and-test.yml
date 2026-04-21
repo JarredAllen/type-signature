@@ -14,30 +14,46 @@ env:
 
 jobs:
   rust:
-    name: Build and Test (${{ matrix.toolchain.name }})
+    name: Build and Test (${{ matrix.name }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        toolchain:
-          - name: stable
-            version: stable
-          - name: MSRV
-            version: msrv  # sentinel — resolved from Cargo.toml below
+        include:
+          # Full test suite, all optional features on, latest and MSRV.
+          - name: stable / all-features
+            toolchain: stable
+            cargo-args: --workspace --all-features
+            lib-only: false
+          - name: MSRV / all-features
+            toolchain: msrv
+            cargo-args: --workspace --all-features
+            lib-only: false
+          # Only run alloc/core on latest versions, seems unlikely that we'd
+          # have a regression only with alloc/core and only on older Rust.
+          - name: stable / alloc-only
+            toolchain: stable
+            cargo-args: -p type-signature --no-default-features --features alloc
+            lib-only: false
+          # no_std smoke test: lib-only build because some tests rely on alloc types.
+          - name: stable / no-default-features
+            toolchain: stable
+            cargo-args: -p type-signature --no-default-features
+            lib-only: true
 
     steps:
     - uses: actions/checkout@v4
     - name: Resolve toolchain version
       id: toolchain
       run: |
-        if [ "${{ matrix.toolchain.version }}" = "msrv" ]; then
+        if [ "${{ matrix.toolchain }}" = "msrv" ]; then
           version=$(awk -F'"' '/^rust-version[[:space:]]*=/ {print $2; exit}' Cargo.toml)
           if [ -z "$version" ]; then
             echo "::error::Could not find rust-version in Cargo.toml"
             exit 1
           fi
         else
-          version="${{ matrix.toolchain.version }}"
+          version="${{ matrix.toolchain }}"
         fi
         echo "Using toolchain: $version"
         echo "version=$version" >> "$GITHUB_OUTPUT"
@@ -50,12 +66,13 @@ jobs:
     - name: Rust Cache
       uses: Swatinem/rust-cache@v2.9.1
       with:
-        key: ${{ matrix.toolchain.name }}
+        key: ${{ matrix.name }}
     - name: Run Clippy
       uses: auguwu/clippy-action@1.5.0
       with:
-        check-args: --workspace --all-features --all-targets
+        check-args: ${{ matrix.cargo-args }} ${{ matrix.lib-only && '--lib' || '--all-targets' }}
         args: -D warnings
         token: ${{secrets.GITHUB_TOKEN}}
     - name: Run tests
-      run: cargo test --workspace --verbose --all-features
+      if: ${{ !matrix.lib-only }}
+      run: cargo test ${{ matrix.cargo-args }} --verbose
