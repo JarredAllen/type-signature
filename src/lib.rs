@@ -1,5 +1,6 @@
 #![doc = include_str!("../README.md")]
 #![no_std]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 
 /// A type that can be made into a signature.
 ///
@@ -316,6 +317,7 @@ impl_for_tuple!(
 );
 
 #[cfg(feature = "std")]
+#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
 mod std_impl {
     extern crate std;
 
@@ -337,6 +339,7 @@ mod std_impl {
 }
 
 #[cfg(feature = "alloc")]
+#[cfg_attr(docsrs, doc(cfg(feature = "alloc")))]
 mod alloc_impl {
     extern crate alloc;
 

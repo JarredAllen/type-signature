@@ -76,3 +76,5 @@ jobs:
     - name: Run tests
       if: ${{ !matrix.lib-only }}
       run: cargo test ${{ matrix.cargo-args }} --verbose
+    - name: Check docs
+      run: RUSTDOCFLAGS="-D warnings" cargo doc --no-deps ${{ matrix.cargo-args }}

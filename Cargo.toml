@@ -1,16 +1,20 @@
 [package]
 name = "type-signature"
-version = "0.1.0"
-edition = "2024"
-rust-version = "1.85"
-authors = ["Jarred Allen <jarredallen73@gmail.com>"]
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
 description = "Compile-time stable structural hash of a Rust type, via a derive macro."
-license = "MIT OR Apache-2.0"
-repository = "https://github.com/JarredAllen/type-signature"
 documentation = "https://docs.rs/type-signature"
 readme = "README.md"
 keywords = ["hash", "type", "signature", "schema", "no-std"]
 categories = ["data-structures", "encoding", "no-std", "rust-patterns"]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
 type-signature-derive = { version = "=0.1.0", path = "./derive/" }
@@ -25,6 +29,14 @@ workspace = true
 
 [workspace]
 members = [".", "./derive/"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+authors = ["Jarred Allen <jarredallen73@gmail.com>"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/JarredAllen/type-signature"
 
 [workspace.lints.rust]
 missing_docs = "warn"
