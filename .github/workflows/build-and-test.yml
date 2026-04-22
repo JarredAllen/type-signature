@@ -13,7 +13,21 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  rust:
+  rust-checks:
+    name: Repo Checks
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install toolchain
+      uses: actions-rust-lang/setup-rust-toolchain@v1
+      with:
+        toolchain: stable
+        components: rustfmt
+        cache: false
+    - name: Check formatting
+      run: cargo fmt --all -- --check
+
+  rust-matrix:
     name: Build and Test (${{ matrix.name }})
     runs-on: ubuntu-latest
     strategy:
