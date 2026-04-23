@@ -1,0 +1,58 @@
+name: Publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run: package and verify, but do not upload to crates.io"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  publish:
+    name: Publish to crates.io${{ inputs.dry_run && ' (dry run)' || '' }}
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Verify Build and Test succeeded on this commit
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        count=$(gh api \
+          "/repos/${{ github.repository }}/actions/workflows/build-and-test.yml/runs?head_sha=${{ github.sha }}&status=success&conclusion=success" \
+          --jq '.total_count')
+        if [ "${count:-0}" -lt 1 ]; then
+          echo "::error::No successful 'Build and Test' run found for commit ${{ github.sha }}. Push the commit and wait for CI to pass before publishing."
+          exit 1
+        fi
+
+    - name: Install toolchain
+      uses: actions-rust-lang/setup-rust-toolchain@v1
+      with:
+        toolchain: stable
+        cache: false
+
+    - name: Publish type-signature-derive
+      env:
+        CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+      run: cargo publish -p type-signature-derive ${{ inputs.dry_run && '--dry-run' || '' }}
+
+    - name: Wait for crates.io to index derive
+      if: ${{ !inputs.dry_run }}
+      run: sleep 30
+
+    # When dry-running before `type-signature-derive` is on crates.io, the
+    # verify step can't resolve exact dependency requirement, so skip verify in
+    # that case. Real publishes always verify.
+    - name: Publish type-signature
+      env:
+        CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+      run: cargo publish -p type-signature ${{ inputs.dry_run && '--dry-run --no-verify' || '' }}
