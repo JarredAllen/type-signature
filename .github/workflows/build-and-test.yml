@@ -26,6 +26,8 @@ jobs:
         cache: false
     - name: Check formatting
       run: cargo fmt --all -- --check
+    - name: Run cargo-semver-checks
+      uses: obi1kenobi/cargo-semver-checks-action@v2
 
   rust-matrix:
     name: Build and Test (${{ matrix.name }})
