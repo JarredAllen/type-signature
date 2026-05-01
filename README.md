@@ -1,5 +1,9 @@
 # type-signature
 
+[![Crates.io](https://img.shields.io/crates/v/type-signature.svg)](https://crates.io/crates/type-signature)
+[![Docs.rs](https://docs.rs/type-signature/badge.svg)](https://docs.rs/type-signature)
+[![CI](https://github.com/JarredAllen/type-signature/actions/workflows/build-and-test.yml/badge.svg)](https://github.com/JarredAllen/type-signature/actions/workflows/build-and-test.yml)
+
 Compile-time structural signatures for Rust types.
 
 Every type that implements [`TypeSignature`] exposes a `SIGNATURE` derived from
