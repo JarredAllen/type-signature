@@ -17,7 +17,7 @@ all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
-type-signature-derive = { version = "=0.1.0", path = "./derive/" }
+type-signature-derive = { version = "=0.1.1", path = "./derive/" }
 
 [features]
 default = ["std", "alloc"]
@@ -31,7 +31,7 @@ workspace = true
 members = [".", "./derive/"]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 rust-version = "1.85"
 authors = ["Jarred Allen <jarredallen73@gmail.com>"]
