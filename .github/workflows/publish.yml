@@ -9,7 +9,7 @@ on:
         default: true
 
 permissions:
-  contents: read
+  contents: write
   actions: read
 
 env:
@@ -56,3 +56,17 @@ jobs:
       env:
         CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
       run: cargo publish -p type-signature ${{ inputs.dry_run && '--dry-run --no-verify' || '' }}
+
+    - name: Create tag and draft GitHub release
+      if: ${{ !inputs.dry_run }}
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        version=$(cargo metadata --format-version 1 --no-deps \
+          | jq -r '.packages[] | select(.name == "type-signature") | .version')
+        tag="v${version}"
+        gh release create "$tag" \
+          --target "${{ github.sha }}" \
+          --title "$tag" \
+          --draft \
+          --generate-notes
