@@ -4,9 +4,9 @@ use std::collections::HashSet;
 
 use proc_macro::TokenStream as TokenStream1;
 
-use proc_macro2::TokenStream;
+use proc_macro2::{Span, TokenStream};
 use quote::quote;
-use syn::{DeriveInput, parse_macro_input};
+use syn::{DeriveInput, Path, parse_macro_input};
 
 /// A struct collecting all info needed for [`derive_type_signature`].
 struct TypeSignatureImpl {
@@ -29,12 +29,22 @@ struct TypeSignatureImpl {
     variants: Vec<TokenStream>,
     /// If `Some`, override the name emitted into the signature (from `#[type_signature(rename = "...")]`).
     rename: Option<String>,
+    /// The path to use for accessing the `type_signature` crate.
+    crate_path: Path,
 }
 impl TryFrom<DeriveInput> for TypeSignatureImpl {
     type Error = syn::Error;
 
     fn try_from(ast: DeriveInput) -> syn::Result<Self> {
         let type_attrs = TypeAttrs::parse(&ast.attrs)?;
+        let crate_path = type_attrs.crate_path.unwrap_or_else(|| Path {
+            leading_colon: Some(syn::token::PathSep(Span::call_site())),
+            segments: {
+                let mut segments = syn::punctuated::Punctuated::new();
+                segments.push(syn::Ident::new("type_signature", Span::call_site()).into());
+                segments
+            },
+        });
         for param in &ast.generics.params {
             if let syn::GenericParam::Const(const_param) = param {
                 let is_ident = matches!(
@@ -57,7 +67,7 @@ impl TryFrom<DeriveInput> for TypeSignatureImpl {
             .any(|param| matches!(param, syn::GenericParam::Type(_)));
         let (variants, generic_constraints) = match ast.data {
             syn::Data::Struct(st) => {
-                let (field_impls, field_tys) = fields_info(&st.fields)?;
+                let (field_impls, field_tys) = fields_info(&st.fields, &crate_path)?;
                 let variants = vec![quote!(("", &[ #( #field_impls ),* ]))];
                 (variants, field_tys)
             }
@@ -70,7 +80,7 @@ impl TryFrom<DeriveInput> for TypeSignatureImpl {
                         let variant_name = variant_attrs
                             .rename
                             .unwrap_or_else(|| variant.ident.to_string());
-                        let (field_impls, field_tys) = fields_info(&variant.fields)?;
+                        let (field_impls, field_tys) = fields_info(&variant.fields, &crate_path)?;
                         let variant_impl = quote!((#variant_name, &[ #( #field_impls ),* ]));
                         Ok((variant_impl, field_tys))
                     })
@@ -105,7 +115,7 @@ impl TryFrom<DeriveInput> for TypeSignatureImpl {
                     });
                     let ty = &field.ty;
                     let variant = quote!(
-                        (#name, &[("", &<#ty as ::type_signature::TypeSignature>::SIGNATURE)])
+                        (#name, &[("", &<#ty as #crate_path::TypeSignature>::SIGNATURE)])
                     );
                     Some(Ok((variant, field.ty.clone())))
                 })
@@ -125,6 +135,7 @@ impl TryFrom<DeriveInput> for TypeSignatureImpl {
             generic_constraints,
             variants,
             rename: type_attrs.rename,
+            crate_path,
         })
     }
 }
@@ -150,13 +161,14 @@ impl quote::ToTokens for TypeSignatureImpl {
             .unwrap_or_else(|| self.ident.to_string());
         let generic_constraints = &self.generic_constraints;
         let variants = &self.variants;
+        let crate_path = &self.crate_path;
         // Every generic type parameter is unconditionally bounded by `TypeSignature`.
         // This covers cases where the parameter appears only in `ty_generics` (e.g. empty
         // enums, or structs where every generic-typed field is `#[type_signature(skip)]`).
         let generic_ty_bounds = self.generics.params.iter().filter_map(|param| {
             if let syn::GenericParam::Type(ty) = param {
                 let ident = &ty.ident;
-                Some(quote!(#ident: ::type_signature::TypeSignature))
+                Some(quote!(#ident: #crate_path::TypeSignature))
             } else {
                 None
             }
@@ -164,7 +176,7 @@ impl quote::ToTokens for TypeSignatureImpl {
         let generic_ty_signatures = self.generics.params.iter().filter_map(|param| {
             if let syn::GenericParam::Type(ty) = param {
                 let ident = &ty.ident;
-                Some(quote!(&<#ident as ::type_signature::TypeSignature>::SIGNATURE))
+                Some(quote!(&<#ident as #crate_path::TypeSignature>::SIGNATURE))
             } else {
                 None
             }
@@ -178,17 +190,15 @@ impl quote::ToTokens for TypeSignatureImpl {
                     .get_ident()
                     .expect("validated in TryFrom::try_from")
                     .to_string();
-                let hash_fn_name = syn::Ident::new(
-                    &format!("hash_const_{param_ty}"),
-                    proc_macro2::Span::call_site(),
-                );
+                let hash_fn_name =
+                    syn::Ident::new(&format!("hash_const_{param_ty}"), Span::call_site());
                 let param_val = &const_param.ident;
                 let param_name = const_param.ident.to_string();
                 Some(quote! { const {
-                    let mut acc = ::type_signature::__macro_export::hash_str(#param_name);
-                    ::type_signature::__macro_export::mix_values(
+                    let mut acc = #crate_path::__macro_export::hash_str(#param_name);
+                    #crate_path::__macro_export::mix_values(
                         &mut acc,
-                        ::type_signature::__macro_export::#hash_fn_name(#param_val)
+                        #crate_path::__macro_export::#hash_fn_name(#param_val)
                     );
                     acc
                 }})
@@ -197,14 +207,14 @@ impl quote::ToTokens for TypeSignatureImpl {
             }
         });
         quote! {
-            impl #impl_generics ::type_signature::TypeSignature for #ident #ty_generics
+            impl #impl_generics #crate_path::TypeSignature for #ident #ty_generics
                 where
                     #( #user_where_predicates, )*
                     #( #generic_ty_bounds, )*
-                    #( #generic_constraints: ::type_signature::TypeSignature ),*
+                    #( #generic_constraints: #crate_path::TypeSignature ),*
             {
                 #![allow(single_use_lifetimes, reason = "Macro-generated code")]
-                const SIGNATURE: ::type_signature::TypeSignatureHasher = ::type_signature::TypeSignatureHasher {
+                const SIGNATURE: #crate_path::TypeSignatureHasher = #crate_path::TypeSignatureHasher {
                     ty_name: #ty_name,
                     ty_generics: &[ #( #generic_ty_signatures ),* ],
                     const_generic_hashes: &[ #( #const_generic_signatures ),* ],
@@ -229,7 +239,10 @@ pub fn derive_type_signature(input: TokenStream1) -> TokenStream1 {
 /// Build `(field_impl_tokens, field_type)` pairs for every field, covering unit/named/tuple shapes.
 ///
 /// Fields marked `#[type_signature(skip)]` are omitted from both vectors.
-fn fields_info(fields: &syn::Fields) -> syn::Result<(Vec<TokenStream>, Vec<syn::Type>)> {
+fn fields_info(
+    fields: &syn::Fields,
+    crate_path: &Path,
+) -> syn::Result<(Vec<TokenStream>, Vec<syn::Type>)> {
     let rows = fields
         .iter()
         .enumerate()
@@ -248,7 +261,7 @@ fn fields_info(fields: &syn::Fields) -> syn::Result<(Vec<TokenStream>, Vec<syn::
                     .map_or_else(|| idx.to_string(), syn::Ident::to_string)
             });
             let ty = &field.ty;
-            let impl_tokens = quote!((#name, &<#ty as ::type_signature::TypeSignature>::SIGNATURE));
+            let impl_tokens = quote!((#name, &<#ty as #crate_path::TypeSignature>::SIGNATURE));
             Some(Ok((impl_tokens, field.ty.clone())))
         })
         .collect::<syn::Result<Vec<_>>>()?;
@@ -260,6 +273,8 @@ fn fields_info(fields: &syn::Fields) -> syn::Result<(Vec<TokenStream>, Vec<syn::
 struct TypeAttrs {
     /// Override the name used in the signature. Lets the signature survive a type rename.
     rename: Option<String>,
+    /// The path to the `type_signature` crate if it needs to be overridden.
+    crate_path: Option<Path>,
 }
 
 impl TypeAttrs {
@@ -274,10 +289,12 @@ impl TypeAttrs {
                     let lit: syn::LitStr = meta.value()?.parse()?;
                     out.rename = Some(lit.value());
                     Ok(())
+                } else if meta.path.is_ident("crate") {
+                    let crate_path: Path = meta.value()?.parse()?;
+                    out.crate_path = Some(crate_path);
+                    Ok(())
                 } else {
-                    Err(meta.error(
-                        "unrecognized type_signature attribute; expected `rename = \"...\"`",
-                    ))
+                    Err(meta.error("unrecognized type_signature attribute {attr:?}"))
                 }
             })?;
         }

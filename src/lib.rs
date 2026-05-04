@@ -38,6 +38,9 @@
 /// - `#[type_signature(rename = "...")]` on the type — use the given name in the signature
 ///   instead of the type's own identifier. Useful for keeping a signature stable across a type
 ///   rename, or for matching the signature of a type in another crate.
+/// - `#[type_signature(crate = "...")]` on the type — use the given path to refer to this crate
+///   (instead of the default `type-signature`), which can be useful if calling the derive macro
+///   from another crate re-exporting the trait.
 /// - `#[type_signature(rename = "...")]` on an enum variant — use the given name for this
 ///   variant in the signature instead of the variant's own identifier. Useful for renaming a
 ///   variant without breaking the signature.
@@ -514,11 +517,30 @@ pub mod __macro_export {
             impl $crate::TypeSignature for $target {
                 const SIGNATURE: $crate::TypeSignatureHasher = {
                     #[derive($crate::TypeSignature)]
+                    #[type_signature(crate = $crate)]
+                    #[allow(dead_code)]
                     $item
 
                     $ident::SIGNATURE
                 };
             }
         };
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[derive(TypeSignature)]
+    #[type_signature(crate = super)]
+    #[allow(dead_code, reason = "Schema depends on it")]
+    struct Foo {
+        bar: u32,
+    }
+
+    #[test]
+    fn test_derive_with_custom_crate_name() {
+        assert_eq!(Foo::CONST_HASH, 0x9cb2_d1de_e1dc_8ae3);
     }
 }
