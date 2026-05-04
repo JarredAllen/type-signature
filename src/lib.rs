@@ -377,6 +377,71 @@ mod alloc_impl {
     }
 }
 
+/// Implement [`TypeSignature`] for the given type as though it had the given definition.
+///
+/// You probably just want to use the derive macro, which is able to do most simple transformations
+/// by itself, but this macro may be useful in niche circumstances where the compiler-understood
+/// fields don't match the underlying shape of the type (for example, if you're bit-packing
+/// multiple flags into a single integer value).
+///
+/// Due to macro limitations, this macro requires the target type to have its name in scope at the
+/// call site, and the macro can't expand paths.
+///
+///
+/// # Example Use
+/// ```
+/// mod mod1 {
+///     use type_signature::impl_type_signature_as;
+///
+///     pub struct Foo;
+///     impl_type_signature_as! {
+///         Foo as struct { a: u32 }
+///     }
+/// }
+///
+/// mod mod2 {
+///     use type_signature::TypeSignature;
+///
+///     #[derive(TypeSignature)]
+///     pub struct Foo { a: u32 }
+/// }
+///
+/// use type_signature::TypeSignature;
+///
+/// assert_eq!(mod1::Foo::CONST_HASH, mod2::Foo::CONST_HASH);
+/// ```
+/// Or, the equivalent for enums:
+/// ```
+/// mod mod1 {
+///     use type_signature::impl_type_signature_as;
+///
+///     pub struct Foo;
+///     impl_type_signature_as! {
+///         Foo as enum { A, B(u32) }
+///     }
+/// }
+///
+/// mod mod2 {
+///     use type_signature::TypeSignature;
+///
+///     #[derive(TypeSignature)]
+///     pub enum Foo { A, B(u32) }
+/// }
+///
+/// use type_signature::TypeSignature;
+///
+/// assert_eq!(mod1::Foo::CONST_HASH, mod2::Foo::CONST_HASH);
+/// ```
+#[macro_export]
+macro_rules! impl_type_signature_as {
+    ($target:ident as struct { $( $fields:tt )* }) => {
+        $crate::_impl_ts_as_helper! { $target as $target in struct $target { $( $fields )* } }
+    };
+    ($target:ident as enum { $( $variants:tt )* }) => {
+        $crate::_impl_ts_as_helper! { $target as $target in enum $target { $( $variants )* } }
+    };
+}
+
 /// Items exported only for use in the derive macro.
 ///
 /// Do not treat anything in here like a public API.
@@ -439,5 +504,21 @@ pub mod __macro_export {
             byte_idx += 1;
         }
         accumulator
+    }
+
+    /// Helper macro for [`crate::impl_type_signature_as`].
+    #[doc(hidden)]
+    #[macro_export]
+    macro_rules! _impl_ts_as_helper {
+        ($target:ty as $ident:ident in $item:item) => {
+            impl $crate::TypeSignature for $target {
+                const SIGNATURE: $crate::TypeSignatureHasher = {
+                    #[derive($crate::TypeSignature)]
+                    $item
+
+                    $ident::SIGNATURE
+                };
+            }
+        };
     }
 }
