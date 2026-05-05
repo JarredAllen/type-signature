@@ -477,7 +477,7 @@ pub mod __macro_export {
         mix_values(&mut accumulator, param_val as u64);
         // Handle 128-bit targets.
         if size_of::<usize>() == 16 {
-            mix_values(&mut accumulator, (param_val >> 8) as u64);
+            mix_values(&mut accumulator, ((param_val as u128) >> 64) as u64);
         }
         accumulator
     }
