@@ -259,12 +259,28 @@ impl_for_stdlib_ty!(
     core::ops::RangeToInclusive<T> where <T: TypeSignature>,
     core::pin::Pin<T> where <T: TypeSignature>,
     core::ptr::NonNull<T> where <T: TypeSignature>,
-    core::sync::atomic::AtomicBool,
-    core::sync::atomic::AtomicU8, core::sync::atomic::AtomicU16, core::sync::atomic::AtomicU32, core::sync::atomic::AtomicU64, core::sync::atomic::AtomicUsize,
-    core::sync::atomic::AtomicI8, core::sync::atomic::AtomicI16, core::sync::atomic::AtomicI32, core::sync::atomic::AtomicI64, core::sync::atomic::AtomicIsize,
     core::cmp::Ordering,
     core::convert::Infallible,
     core::time::Duration,
+);
+
+#[cfg(target_has_atomic = "8")]
+impl_for_stdlib_ty!(
+    core::sync::atomic::AtomicBool,
+    core::sync::atomic::AtomicI8,
+    core::sync::atomic::AtomicU8,
+);
+#[cfg(target_has_atomic = "16")]
+impl_for_stdlib_ty!(core::sync::atomic::AtomicI16, core::sync::atomic::AtomicU16);
+#[cfg(target_has_atomic = "32")]
+impl_for_stdlib_ty!(core::sync::atomic::AtomicI32, core::sync::atomic::AtomicU32);
+#[cfg(target_has_atomic = "64")]
+impl_for_stdlib_ty!(core::sync::atomic::AtomicI64, core::sync::atomic::AtomicU64);
+#[cfg(target_has_atomic = "ptr")]
+impl_for_stdlib_ty!(
+    core::sync::atomic::AtomicIsize,
+    core::sync::atomic::AtomicUsize,
+    core::sync::atomic::AtomicPtr<T> where <T: TypeSignature>,
 );
 
 impl<const N: usize, T: TypeSignature> TypeSignature for [T; N] {
@@ -363,9 +379,13 @@ mod alloc_impl {
         alloc::rc::Rc<T> where <T: TypeSignature>,
         alloc::rc::Weak<T> where <T: TypeSignature>,
         alloc::string::String,
+        alloc::vec::Vec<T> where <T: TypeSignature>,
+    );
+
+    #[cfg(target_has_atomic = "ptr")]
+    impl_for_stdlib_ty!(
         alloc::sync::Arc<T> where <T: TypeSignature>,
         alloc::sync::Weak<T> where <T: TypeSignature>,
-        alloc::vec::Vec<T> where <T: TypeSignature>,
     );
 
     impl<'a, B: TypeSignature + alloc::borrow::ToOwned + ?Sized + 'a> TypeSignature

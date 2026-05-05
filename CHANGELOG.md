@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Fixed
+- Fixed unconditional impl blocks for atomic types which may or may not exist on some architectures.
+
 ## [0.1.2] - 2026-05-04
 
 ### Added
