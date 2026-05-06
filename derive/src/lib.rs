@@ -86,12 +86,7 @@ impl TryFrom<DeriveInput> for TypeSignatureImpl {
                     })
                     .collect::<syn::Result<Vec<_>>>()?;
                 let (variants, per_variant_field_tys): (Vec<_>, Vec<_>) = rows.into_iter().unzip();
-                let field_tys = per_variant_field_tys
-                    .into_iter()
-                    .flatten()
-                    .collect::<HashSet<_>>()
-                    .into_iter()
-                    .collect();
+                let field_tys = deduplicate(per_variant_field_tys.into_iter().flatten()).collect();
                 (variants, field_tys)
             }
             syn::Data::Union(un) => un
@@ -234,6 +229,14 @@ pub fn derive_type_signature(input: TokenStream1) -> TokenStream1 {
         Err(e) => e.into_compile_error(),
     }
     .into()
+}
+
+/// Deduplicate an iterator while preserving the order the elements first appear.
+fn deduplicate<T: core::hash::Hash + Eq + Clone>(
+    elems: impl IntoIterator<Item = T>,
+) -> impl Iterator<Item = T> {
+    let mut seen = HashSet::new();
+    elems.into_iter().filter(move |ty| seen.insert(ty.clone()))
 }
 
 /// Build `(field_impl_tokens, field_type)` pairs for every field, covering unit/named/tuple shapes.

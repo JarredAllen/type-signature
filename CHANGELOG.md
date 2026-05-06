@@ -5,6 +5,7 @@
 ### Fixed
 - Fixed unconditional impl blocks for atomic types which may or may not exist on some architectures.
 - Fixed incorrect `usize` hashing logic on platforms with 128-bit pointers.
+- Fixed non-reproducible ordering of where clauses in derive macro output.
 
 ## [0.1.2] - 2026-05-04
 
