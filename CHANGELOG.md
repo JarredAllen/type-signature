@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-05-06
+
 ### Fixed
 - Fixed unconditional impl blocks for atomic types which may or may not exist on some architectures.
 - Fixed incorrect `usize` hashing logic on platforms with 128-bit pointers.
@@ -28,7 +30,8 @@
 
 - Initial release.
 
-[Unreleased]: https://github.com/JarredAllen/type-signature/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/JarredAllen/type-signature/compare/v0.1.3...HEAD
+[0.1.3]: https://github.com/JarredAllen/type-signature/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/JarredAllen/type-signature/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/JarredAllen/type-signature/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/JarredAllen/type-signature/releases/tag/v0.1.0
